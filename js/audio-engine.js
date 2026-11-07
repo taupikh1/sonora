@@ -20,7 +20,7 @@ export const cycleRepeat=()=>st.repeat=({off:'all',all:'one',one:'off'})[st.repe
 export const toggleShuffle=()=>{st.shuffle=!st.shuffle;if(st.shuffle){const h=st.queue.slice(0,st.i+1);st.queue=[...h,...shuf(st.queue.slice(st.i+1))]}};
 export const playNext=id=>st.i<0?setQueue([id]):void st.queue.splice(st.i+1,0,id);
 export const addQueue=id=>st.i<0?setQueue([id]):void st.queue.push(id);
-function setMeta(t){if(!ms)return;ms.metadata=new MediaMetadata({title:t.title,artist:t.artist,album:t.album||'',artwork:[{src:'assets/icons/icon-512.png',sizes:'512x512',type:'image/png'}]})}
+function setMeta(t){if(!ms)return;ms.metadata=new MediaMetadata({title:t.title,artist:t.artist,album:t.album||'',artwork:[st.art?.(t)?{src:st.art(t)}:{src:'assets/icons/icon-512.png',sizes:'512x512',type:'image/png'}]})}
 audio.onended=()=>st.repeat==='one'?(audio.currentTime=0,audio.play()):next();
 audio.onerror=()=>st.cur()&&emit('error');
 audio.onplay=()=>{if(ms)ms.playbackState='playing';emit('state')};

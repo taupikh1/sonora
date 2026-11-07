@@ -1,4 +1,5 @@
 // Parser header audio: hanya membaca potongan file (header/moov), bukan seluruh file.
+import {flacTags,id3,mp4tags,ogg,aiff} from './tags.js';
 const A=String.fromCharCode;
 export async function readInfo(f){
   const rd=async(o,n)=>new DataView(await f.slice(o,o+n).arrayBuffer());
@@ -40,9 +41,10 @@ export async function readInfo(f){
       Object.assign(r,{codec:fm==='alac'?'ALAC':fm==='mp4a'?'AAC':fm,lossless:fm==='alac'?true:fm==='mp4a'?false:null,ch:mv.getUint16(e+24),sr:mv.getUint16(e+32)});
       if(fm==='alac'){const a=find('alac',e+8);if(a>0){r.bits=mv.getUint8(a+13);r.ch=mv.getUint8(a+17);r.sr=mv.getUint32(a+28)}}}
     if(r.dur)r.br=f.size*8/r.dur;
-    return r};
+    return Object.assign(r,mp4tags(mv))};
   try{const h=await rd(0,12),m=tx(h,0,4);
-    const r=m==='fLaC'?await flac():m==='RIFF'&&tx(h,8,4)==='WAVE'?await wav():tx(h,4,4)==='ftyp'?await mp4():m==='OggS'?{container:'Ogg'}:await mp3();
+    const r=m==='fLaC'?await flac():m==='RIFF'&&tx(h,8,4)==='WAVE'?await wav():tx(h,4,4)==='ftyp'?await mp4():m==='OggS'?await ogg(f,rd):m==='FORM'?await aiff(f,rd,tx):await mp3();
+    if(r.container==='FLAC')Object.assign(r,await flacTags(f,rd));else if(r.container==='MPEG audio')Object.assign(r,await id3(f,rd));
     if(r.dur&&!r.br&&r.lossless)r.br=f.size*8/r.dur;
     return r}catch(e){return{err:1}}
 }
