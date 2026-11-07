@@ -1,5 +1,5 @@
 // Parser header audio: hanya membaca potongan file (header/moov), bukan seluruh file.
-import {flacTags,id3,mp4tags,ogg,aiff} from './tags.js';
+import {flacTags,id3,mp4tags,ogg,aiff,riffTags} from './tags.js';
 const A=String.fromCharCode;
 export async function readInfo(f){
   const rd=async(o,n)=>new DataView(await f.slice(o,o+n).arrayBuffer());
@@ -10,7 +10,8 @@ export async function readInfo(f){
     while(o+8<=f.size){const c=await rd(o,8),id=tx(c,0,4),n=c.getUint32(4,true);
       if(id==='fmt '){const d=await rd(o+8,Math.min(n,40));let t=d.getUint16(0,true);if(t===0xFFFE&&n>=26)t=d.getUint16(24,true);
         Object.assign(r,{codec:t===1?'PCM':t===3?'PCM float':'WAVE 0x'+t.toString(16),lossless:t===1||t===3?true:null,ch:d.getUint16(2,true),sr:d.getUint32(4,true),br:d.getUint32(8,true)*8,bits:d.getUint16(14,true)})}
-      else if(id==='data'){const sz=n>f.size-o-8?f.size-o-8:n;r.dur=r.br?sz*8/r.br:null;break}
+      else if(id==='data'){const sz=n>f.size-o-8?f.size-o-8:n;r.dur=r.br?sz*8/r.br:null}
+      else if(id==='LIST'&&n<65536){const d=await rd(o+8,n);if(tx(d,0,4)==='INFO')r.tags=riffTags(d,tx)}
       o+=8+n+(n&1)}
     return r};
   const mp3=async()=>{const h=await rd(0,10);let o=0;
@@ -29,10 +30,10 @@ export async function readInfo(f){
       if(!r.dur)r.dur=(f.size-o)*8/r.br;
       return r}
     return{container:'tidak dikenali'}};
-  const mp4=async()=>{let o=0,mv;
+  const mp4=async()=>{let o=0,mv,md=0;
     while(o+8<=f.size){const c=await rd(o,16);let n=c.getUint32(0);const id=tx(c,4,4);
       if(n===1)n=c.getUint32(8)*2**32+c.getUint32(12);if(n===0)n=f.size-o;
-      if(id==='moov'){mv=await rd(o+8,Math.min(n-8,4e6));break}if(n<8)break;o+=n}
+      if(id==='moov')mv=await rd(o+8,Math.min(n-8,4e6));else if(id==='mdat')md=n-8;if(n<8)break;o+=n}
     if(!mv)return{container:'MP4'};
     const find=(s,from=0)=>{for(let i=from;i+4<=mv.byteLength;i++)if(mv.getUint8(i)===s.charCodeAt(0)&&tx(mv,i,4)===s)return i;return -1};
     const r={container:'MP4/M4A'},hd=find('mdhd'),s=find('stsd');
@@ -40,12 +41,12 @@ export async function readInfo(f){
     if(s>0){const e=s+12,fm=tx(mv,e+4,4);
       Object.assign(r,{codec:fm==='alac'?'ALAC':fm==='mp4a'?'AAC':fm,lossless:fm==='alac'?true:fm==='mp4a'?false:null,ch:mv.getUint16(e+24),sr:mv.getUint16(e+32)});
       if(fm==='alac'){const a=find('alac',e+8);if(a>0){r.bits=mv.getUint8(a+13);r.ch=mv.getUint8(a+17);r.sr=mv.getUint32(a+28)}}}
-    if(r.dur)r.br=f.size*8/r.dur;
+    if(r.dur)r.br=(md||f.size)*8/r.dur;
     return Object.assign(r,mp4tags(mv))};
   try{const h=await rd(0,12),m=tx(h,0,4);
     const r=m==='fLaC'?await flac():m==='RIFF'&&tx(h,8,4)==='WAVE'?await wav():tx(h,4,4)==='ftyp'?await mp4():m==='OggS'?await ogg(f,rd):m==='FORM'?await aiff(f,rd,tx):await mp3();
     if(r.container==='FLAC')Object.assign(r,await flacTags(f,rd));else if(r.container==='MPEG audio')Object.assign(r,await id3(f,rd));
-    if(r.dur&&!r.br&&r.lossless)r.br=f.size*8/r.dur;
+    if(r.dur&&!r.br&&r.lossless)r.br=(f.size-(r.off||0))*8/r.dur;
     return r}catch(e){return{err:1}}
 }
 export const quality=i=>{if(!i||!i.codec)return null;

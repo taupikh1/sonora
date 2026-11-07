@@ -5,13 +5,15 @@ const norm=m=>{const t={title:m.TITLE,artist:m.ARTIST,album:m.ALBUM,albumArtist:
   return{...t,rg:{track:g('REPLAYGAIN_TRACK_GAIN'),album:g('REPLAYGAIN_ALBUM_GAIN'),peak:g('REPLAYGAIN_TRACK_PEAK')}}};
 const vc=(d,o)=>{const m={};let n=d.getUint32(o,true);o+=4+n;n=d.getUint32(o,true);o+=4;
   while(n--&&o+4<=d.byteLength){const l=d.getUint32(o,true),s=new TextDecoder().decode(new Uint8Array(d.buffer,d.byteOffset+o+4,Math.min(l,d.byteLength-o-4))),i=s.indexOf('=');o+=4+l;if(i>0)m[s.slice(0,i).toUpperCase()]=s.slice(i+1)}return m};
+export const riffTags=(d,tx)=>{const m={},K={INAM:'TITLE',IART:'ARTIST',IPRD:'ALBUM',ITRK:'TRACKNUMBER',IGNR:'GENRE',ICRD:'DATE'};
+  for(let o=4;o+8<=d.byteLength;){const id=tx(d,o,4),n=d.getUint32(o+4,true);if(K[id])m[K[id]]=tx(d,o+8,n).replace(/\0+$/,'');o+=8+n+(n&1)}return norm(m)};
 export async function flacTags(f,rd){let o=4,m={},cover;
   for(let last=0;!last&&o+4<f.size;){const h=await rd(o,4),t=h.getUint8(0)&127,n=h.getUint32(0)&0xFFFFFF;last=h.getUint8(0)>>7;
     if(t===4&&n<1e6)m=vc(await rd(o+4,n),0);
     if(t===6&&!cover&&n<3e6){const d=await rd(o+4,n),ml=d.getUint32(4),mime=new TextDecoder().decode(new Uint8Array(d.buffer,d.byteOffset+8,ml));let p=8+ml;p+=4+d.getUint32(p);p+=16;
       cover=new Blob([new Uint8Array(d.buffer,d.byteOffset+p+4,d.getUint32(p))],{type:mime})}
     o+=4+n}
-  return{tags:norm(m),cover}}
+  return{tags:norm(m),cover,off:o}}
 const MAP={TIT2:'TITLE',TPE1:'ARTIST',TALB:'ALBUM',TPE2:'ALBUMARTIST',TRCK:'TRACKNUMBER',TPOS:'DISCNUMBER',TCON:'GENRE',TDRC:'DATE',TYER:'DATE'};
 export async function id3(f,rd){const h=await rd(0,10);if(String.fromCharCode(h.getUint8(0),h.getUint8(1),h.getUint8(2))!=='ID3')return{};
   const ver=h.getUint8(3),sz=Math.min((h.getUint8(6)<<21)|(h.getUint8(7)<<14)|(h.getUint8(8)<<7)|h.getUint8(9),8e6),d=await rd(10,sz),u=new Uint8Array(d.buffer,d.byteOffset,d.byteLength),m={};let cover,o=0;
@@ -28,6 +30,7 @@ export function mp4tags(mv){const tx=(o,n)=>{let s='';for(let i=0;i<n;i++)s+=Str
   while(o+24<=end){const n=mv.getUint32(o),id=tx(o+4,4);if(n<24)break;const L=n-24,q=o+24,by=new Uint8Array(mv.buffer,mv.byteOffset+q,L);
     if(id==='covr'&&!cover)cover=new Blob([by],{type:(mv.getUint32(o+16)&0xFFFFFF)===14?'image/png':'image/jpeg'});
     else if(id==='trkn')m.TRACKNUMBER=''+mv.getUint16(q+2);else if(id==='disk')m.DISCNUMBER=''+mv.getUint16(q+2);
+    else if(id==='----'){const g=/replaygain_(track|album)_(gain|peak)[\s\S]*?data[\s\S]{8}([-+0-9.]+)/i.exec(new TextDecoder('latin1').decode(new Uint8Array(mv.buffer,mv.byteOffset+o+8,n-8)));if(g)m['REPLAYGAIN_'+g[1].toUpperCase()+'_'+g[2].toUpperCase()]=g[3]}
     else if(K[id])m[K[id]]=new TextDecoder().decode(by);
     o+=n}
   return{tags:norm(m),cover}}
