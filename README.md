@@ -18,13 +18,7 @@ MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF dicek dengan `canPlayType` saat import
 ## Phase 8 (UI/UX) - ringkas
 Bottom nav (Home/Library/Search/Playlists/Settings), mini player di atas nav, Now Playing baru (artwork persegi, badge kualitas), tema Dark/Light/AMOLED/System + 5 aksen + warna kustom (localStorage), halaman Settings 6 kategori yang semuanya berfungsi, dialog konfirmasi/input kustom, skeleton, empty state, toast. File berubah: index.html, css/main.css, js/app.js, service-worker.js (cache v5).
 
-## Phase 11 (enhancements)
-- Playback speed (0.5x–2x) di Now Playing.
-- Antrean lebih baik: lihat, lompat, hapus item, kosongkan.
-- Keyboard shortcuts (Space, ←→, N/P, S, R, F, Q).
-- Import progress toast.
-- Mode multi-select dasar (aktifkan via kode / tombol nanti).
-- Catatan: backup hanya metadata (file audio tetap di IndexedDB perangkat).
+## Phase 10 (fitur lanjutan)
 - **Audio Information** di Now Playing kini satu chip yang bisa diketuk (tidak lagi menimpa badge); layout diuji di 390x844, 390x664, 360x640, 320x568 tanpa tumpang tindih. Ikon kontrol memakai SVG (bukan emoji).
 - **Equalizer 10-band** (31 Hz - 16 kHz, +/-12 dB): 23 preset, slider sentuh/keyboard, pre-amp, profil custom (simpan/hapus). Preset menurunkan pre-amp otomatis agar tidak clipping.
 - **ReplayGain** Track/Album dari tag (FLAC/Vorbis comment, ID3 TXXX, MP4). Lagu tanpa tag tidak diubah. Tag tampil di Audio Information.
