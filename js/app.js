@@ -234,3 +234,68 @@ function editMeta(t){return new Promise(res=>{const d=$('#dlg');let art,clr=0,in
     for(const c of tg){const n={...c};if(c.id===t.id){n.ov=ov;Object.assign(n,ov);if(!ov.genre)delete n.genre;if(!ov.year)delete n.year}else{n.ov={...(c.ov||{}),album:ov.album};n.album=ov.album}
       if(art||clr){n.ovCover=art||null;n.cover=art||undefined;dropUrl(c.id)}await S.put('tracks',n);st.lib.set(n.id,n)}
     render();drawTrack();E.refreshMeta();toast('Metadata disimpan.');end()}})}
+
+// ===== Phase 11 enhancements: speed, queue, keyboard, multi-select, import progress =====
+let speed=+(localStorage.getItem('speed')||1);
+function applySpeed(){E.setSpeed(speed);const b=$('#sp');if(b)b.textContent=speed.toFixed(1).replace('.0','')+'x'}
+applySpeed();
+$('#sp')&&($('#sp').onclick=()=>{speed=speed>=2?0.5:speed+0.25;localStorage.setItem('speed',speed);applySpeed();toast('Kecepatan '+speed+'x')});
+
+// Enhanced queue sheet
+function showQueue(){
+  const items=st.queue.map((id,i)=>{const t=st.lib.get(id);return [ (i===st.i?'▶ ':'')+(t?t.title:'?')+(i===st.i?' (sekarang)':''), ()=>{if(i!==st.i)E.playAt(i)} ]});
+  items.push(['Hapus lagu ini dari antrean',()=>{if(st.i>=0){st.queue.splice(st.i,1);if(st.i>=st.queue.length)st.i=Math.max(0,st.queue.length-1);E.playAt(st.i||0);toast('Dihapus dari antrean')}}]);
+  items.push(['Kosongkan antrean',()=>{st.queue=[];st.i=-1;audio.pause();$('#mini').hidden=true;$('#np').hidden=true;toast('Antrean dikosongkan')}]);
+  sheet('Antrean',items);
+}
+$('#npq').onclick=showQueue;
+
+// Keyboard shortcuts
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,textarea')||!$('#dlg').hidden||!$('#sheet').hidden)return;
+  if(e.key===' '||e.code==='Space'){e.preventDefault();E.toggle()}
+  else if(e.key==='ArrowRight'){e.preventDefault();audio.currentTime=Math.min((audio.duration||0),audio.currentTime+10)}
+  else if(e.key==='ArrowLeft'){e.preventDefault();audio.currentTime=Math.max(0,audio.currentTime-10)}
+  else if(e.key==='n'||e.key==='N')E.next()
+  else if(e.key==='p'||e.key==='P')E.prev()
+  else if(e.key==='s'||e.key==='S'){E.toggleShuffle();drawState()}
+  else if(e.key==='r'||e.key==='R'){E.cycleRepeat();drawState()}
+  else if(e.key==='f'||e.key==='F'){const t=st.cur();if(t)saveTrack({...t,fav:!t.fav})}
+  else if(e.key==='q'||e.key==='Q')showQueue()
+  else if(e.key==='Escape'&&!$('#np').hidden)$('#np').hidden=true;
+});
+
+// Multi-select mode (basic)
+let multi=false,sel=new Set();
+function toggleMulti(){multi=!multi;sel.clear();toast(multi?'Mode pilih aktif. Ketuk lagu untuk pilih.':'Mode pilih mati');render()}
+document.addEventListener('click',e=>{
+  if(!multi||!e.target.closest('[data-play]'))return;
+  e.stopPropagation();const id=e.target.closest('[data-play]').dataset.play;
+  sel.has(id)?sel.delete(id):sel.add(id);e.target.closest('.row')?.classList.toggle('sel',sel.has(id));
+},{capture:true});
+
+// Import progress
+const oldFileHandler=document.getElementById('file').onchange;
+document.getElementById('file').onchange=async function(e){
+  const fs=[...e.target.files||[]];if(!fs.length)return;
+  toast(`Mengimpor ${fs.length} file...`);
+  let n=0,dup=0,bad=[];
+  for(const f of fs){
+    try{
+      const mime=probe(f);if(!mime){bad.push(f.name);continue}
+      const id=crypto.randomUUID(),d=await dur(f).catch(()=>0);
+      if([...st.lib.values()].some(t=>t.fname===f.name&&t.size===f.size)){dup++;continue}
+      const {title,artist}=parseName(f.name);
+      await S.put('blobs',new Blob([f],{type:mime.split(';')[0]}),id);
+      const t={id,title,artist,album:'',duration:d,fname:f.name,format:ext(f.name),size:f.size,added:Date.now(),fav:false};
+      await S.put('tracks',t);st.lib.set(id,t);await ensureInfo(t);n++;
+      if(n%5===0)toast(`Diimpor ${n}/${fs.length}...`);
+    }catch{bad.push(f.name)}
+  }
+  e.target.value='';render();
+  toast(`${n} lagu ditambahkan${dup?`, ${dup} dilewati`:''}.`);
+  if(bad.length)setTimeout(()=>toast(`Gagal: ${bad.slice(0,2).join(', ')}`),1500);
+};
+
+// Note in settings about backup (override via render hook if needed)
+console.log('SONORA Phase 11 enhancements loaded');

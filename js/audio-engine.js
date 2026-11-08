@@ -35,7 +35,7 @@ export const restore=(ids,i,pos)=>{st.queue=ids;return playAt(i,false,pos)};
 export const next=()=>{if(st.i+1<st.queue.length)playAt(st.i+1);else if(st.repeat==='all')playAt(0);else{audio.pause();audio.currentTime=0}};
 export const prev=()=>{if(audio.currentTime>3||st.i<=0)audio.currentTime=0;else playAt(st.i-1)};
 export const toggle=()=>audio.src&&(audio.paused?audio.play():audio.pause());
-export const cycleRepeat=()=>st.repeat=({off:'all',all:'one',one:'off'})[st.repeat];
+export const setSpeed=(rate)=>{if(cur)cur.playbackRate=Math.max(0.5,Math.min(2,rate||1))};
 export const toggleShuffle=()=>{st.shuffle=!st.shuffle;if(st.shuffle){const h=st.queue.slice(0,st.i+1);st.queue=[...h,...shuf(st.queue.slice(st.i+1))]}};
 export const playNext=id=>st.i<0?setQueue([id]):void st.queue.splice(st.i+1,0,id);
 export const addQueue=id=>st.i<0?setQueue([id]):void st.queue.push(id);
