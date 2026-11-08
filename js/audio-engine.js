@@ -1,6 +1,7 @@
 import {get} from './storage.js';
 // `audio` = proxy ke elemen aktif. Elemen kedua hanya dibuat untuk crossfade/gapless (bukan iOS, bukan Web Audio).
-const mk=()=>{const a=new Audio();a.preload='auto';return a};
+let spd=1;
+const mk=()=>{const a=new Audio();a.preload='auto';a.defaultPlaybackRate=a.playbackRate=spd;return a};
 let cur=mk(),nxt=null,oldEl=null,url,nxtUrl,ni=-1,pre=null,tm=0,iv=0,prepping=false,emit=()=>{};
 export const audio=new Proxy({},{get:(_,k)=>{const v=cur[k];return typeof v==='function'?v.bind(cur):v},set:(_,k,v)=>(cur[k]=v,true)});
 export const raw=()=>cur;
@@ -35,10 +36,20 @@ export const restore=(ids,i,pos)=>{st.queue=ids;return playAt(i,false,pos)};
 export const next=()=>{if(st.i+1<st.queue.length)playAt(st.i+1);else if(st.repeat==='all')playAt(0);else{audio.pause();audio.currentTime=0}};
 export const prev=()=>{if(audio.currentTime>3||st.i<=0)audio.currentTime=0;else playAt(st.i-1)};
 export const toggle=()=>audio.src&&(audio.paused?audio.play():audio.pause());
-export const setSpeed=(rate)=>{if(cur)cur.playbackRate=Math.max(0.5,Math.min(2,rate||1))};
-export const toggleShuffle=()=>{st.shuffle=!st.shuffle;if(st.shuffle){const h=st.queue.slice(0,st.i+1);st.queue=[...h,...shuf(st.queue.slice(st.i+1))]}};
-export const playNext=id=>st.i<0?setQueue([id]):void st.queue.splice(st.i+1,0,id);
-export const addQueue=id=>st.i<0?setQueue([id]):void st.queue.push(id);
+export const setSpeed=r=>{spd=Math.max(0.5,Math.min(2,r||1));cur.defaultPlaybackRate=cur.playbackRate=spd};
+export const cycleRepeat=()=>{st.repeat=st.repeat==='off'?'all':st.repeat==='all'?'one':'off'};
+export const toggleShuffle=()=>{queueChanged();st.shuffle=!st.shuffle;if(st.shuffle){const h=st.queue.slice(0,st.i+1);st.queue=[...h,...shuf(st.queue.slice(st.i+1))]}};
+export function queueChanged(){if(pre){URL.revokeObjectURL(pre.url);pre=null}clearTimeout(tm);tm=0;if(nxt){nxt.removeAttribute('src');URL.revokeObjectURL(nxtUrl);nxt=null}}
+export const playNext=id=>{if(st.i<0)return setQueue([id]);queueChanged();st.queue.splice(st.i+1,0,id)};
+export const addQueue=id=>{if(st.i<0)return setQueue([id]);queueChanged();st.queue.push(id)};
+export function moveQ(a,b){const n=st.queue.length;if(a===b||a<0||b<0||a>=n||b>=n)return;queueChanged();const[x]=st.queue.splice(a,1);st.queue.splice(b,0,x);const c=st.i;if(a===c)st.i=b;else if(a<c&&b>=c)st.i--;else if(a>c&&b<=c)st.i++}
+export function clearUpcoming(){queueChanged();st.queue=st.queue.slice(0,st.i+1)}
+export function clearAll(){reset();audio.pause();audio.removeAttribute('src');audio.load();if(url){URL.revokeObjectURL(url);url=null}st.queue=[];st.i=-1;if(ms){ms.metadata=null;ms.playbackState='none'}emit('cleared')}
+export function removeAt(i){if(i<0||i>=st.queue.length)return;queueChanged();
+  if(i!==st.i){st.queue.splice(i,1);if(i<st.i)st.i--;return}
+  const was=!audio.paused;st.queue.splice(i,1);
+  if(!st.queue.length)return clearAll();
+  return playAt(i<st.queue.length?i:st.queue.length-1,i<st.queue.length&&was)}
 function setMeta(t){if(!ms)return;ms.metadata=new MediaMetadata({title:t.title,artist:t.artist,album:t.album||'',artwork:[st.art?.(t)?{src:st.art(t)}:{src:'assets/icons/icon-512.png',sizes:'512x512',type:'image/png'}]})}
 function wire(a){
   a.onended=()=>{if(a!==cur)return;if(st.repeat==='one'){a.currentTime=0;a.play();return}if(nxt){swap();return}if(pre&&cfg.gapless){fast();return}next()};

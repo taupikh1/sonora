@@ -18,7 +18,22 @@ MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF dicek dengan `canPlayType` saat import
 ## Phase 8 (UI/UX) - ringkas
 Bottom nav (Home/Library/Search/Playlists/Settings), mini player di atas nav, Now Playing baru (artwork persegi, badge kualitas), tema Dark/Light/AMOLED/System + 5 aksen + warna kustom (localStorage), halaman Settings 6 kategori yang semuanya berfungsi, dialog konfirmasi/input kustom, skeleton, empty state, toast. File berubah: index.html, css/main.css, js/app.js, service-worker.js (cache v5).
 
-## Phase 10 (fitur lanjutan)
+## Phase 12 (stabilisasi)
+- **Hotfix crash:** tombol Repeat (`#rp`) dan `cycleRepeat` hilang di Phase 11 sehingga seluruh aplikasi mati. Dikembalikan; error JS sekarang tampil sebagai toast.
+- **Tes otomatis:** `tests/e2e.mjs` (43 pemeriksaan: boot, navigasi, impor, play/pause/next/prev/repeat/shuffle, kecepatan, favorit, search, playlist, antrean, gapless, backup/restore, diagnostik, tema, PWA offline, layout 320-390px). Jalankan: `npm i --no-save puppeteer && node tests/e2e.mjs`. Hasil terakhir: 43/43 PASS (Chromium headless).
+- **Antrean penuh:** ketuk untuk memutar, urut ulang dengan ▲▼, hapus per lagu, kosongkan yang akan datang, atau hentikan dan kosongkan semua. Antrean yang diubah ikut membatalkan lagu berikutnya yang sudah disiapkan (sebelumnya, pada mode Gapless, judul di layar bisa tidak sama dengan audio yang diputar).
+- **Backup & restore:** ekspor berisi daftar lagu, favorit, edit metadata, playlist, dan pengaturan. File audio **tidak** ikut (terlalu besar untuk JSON). Pulihkan: impor dulu file audionya, lalu pilih backup; lagu dicocokkan lewat nama file + ukuran. Artwork hasil edit tidak ikut backup.
+- **Kecepatan putar:** ada di Pengaturan > Playback dan di Audio Information; bertahan antar lagu; dikunci 1x saat Bit-Perfect ON (karena mengubah kecepatan berarti memproses audio).
+- **Diagnostik perangkat:** Pengaturan > Storage; menampilkan dukungan format, Media Session, Web Audio, service worker, cache, penyimpanan persisten.
+- **Uji iPhone:** lihat `TESTING_IPHONE.md` (14 butir yang tidak bisa diuji otomatis; status di bawah tetap NOT TESTED sampai diisi).
+- Cache service worker `sonora-v12`; ikon favicon ditambahkan; kontrol Now Playing muat di layar 320px.
+- Dihapus: kode multi-select yang tidak punya tombol, handler impor/antrean ganda.
+
+## Phase 11 (enhancements, sebagian disempurnakan di Phase 12)
+- Playback speed (0.5x–2x) di Now Playing.
+- Keyboard shortcuts (Space, ←→, N/P, S, R, F, Q).
+- Import progress toast.
+- Catatan: backup hanya metadata (file audio tetap di IndexedDB perangkat).
 - **Audio Information** di Now Playing kini satu chip yang bisa diketuk (tidak lagi menimpa badge); layout diuji di 390x844, 390x664, 360x640, 320x568 tanpa tumpang tindih. Ikon kontrol memakai SVG (bukan emoji).
 - **Equalizer 10-band** (31 Hz - 16 kHz, +/-12 dB): 23 preset, slider sentuh/keyboard, pre-amp, profil custom (simpan/hapus). Preset menurunkan pre-amp otomatis agar tidak clipping.
 - **ReplayGain** Track/Album dari tag (FLAC/Vorbis comment, ID3 TXXX, MP4). Lagu tanpa tag tidak diubah. Tag tampil di Audio Information.
@@ -48,7 +63,8 @@ EQ/ReplayGain/Visualizer membutuhkan Web Audio; di iOS Safari Web Audio bisa dit
 | Instal PWA (Add to Home Screen), safe area fisik | NOT TESTED | |
 | Gapless, Crossfade, EQ, ReplayGain (kualitas audio) | NOT TESTED | EQ hanya diuji jalur Web Audio terbentuk |
 | AIFF, FLAC di Safari | NOT TESTED | Chromium tidak memutar AIFF (ditolak dengan pesan jelas) |
-| Folders, Queue penuh, reorder, impor backup | Belum ada | |
+| Folders | Belum ada | |
+| Queue penuh, reorder, impor backup | PASS (Chromium, Phase 12) | tests/e2e.mjs |
 
 ## Batasan
 Browser tidak bisa memverifikasi output hardware, jadi status tertinggi adalah DIRECT PLAYBACK. iOS memproses audio lewat mixer sistem. Penyimpanan situs di Safari bisa dibersihkan iOS jika tidak dipakai lama; pasang ke Home Screen dan gunakan "Penyimpanan persisten".
