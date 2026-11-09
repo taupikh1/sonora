@@ -20,5 +20,12 @@ Tes otomatis (`tests/e2e.mjs`) berjalan di Chromium, jadi **tidak** membuktikan 
 | 12 | Gapless | Pengaturan → Gapless ON; putar 2 lagu album live/DJ-mix yang bersambung | Dengarkan sambungan: ada jeda atau tidak? Cek angka "Transisi lagu terakhir" di Diagnostik | |
 | 13 | Backup & restore | Ekspor backup, hapus 1 playlist, Pulihkan dari backup | Playlist dan favorit kembali (file `.json` tersimpan di Files / Downloads) | |
 | 14 | Antrean | Tambah 3 lagu ke antrean, urutkan dengan ▲▼, hapus satu | Urutan putar mengikuti daftar | |
+| 15 | Interupsi: aplikasi lain | Putar lagu di SONORA (dari Home Screen). Buka Instagram/TikTok, putar video yang bersuara, lalu keluar dari aplikasi itu (kembali ke SONORA) | Lagu SONORA lanjut sendiri dalam beberapa detik | |
+| 16 | Interupsi: tidak kembali ke SONORA | Sama seperti 15, tapi setelah sosmed ditutup tetap di Home Screen (jangan buka SONORA), tunggu 30 detik | Lagu lanjut sendiri (best effort; jika tidak, catat) | |
+| 17 | Interupsi: panggilan / alarm / Siri | Putar lagu, minta Siri atau telepon masuk lalu selesai | Lagu lanjut sendiri setelah selesai | |
+| 18 | Pause manual tidak lanjut sendiri | Pause dengan tombol, buka aplikasi lain, kembali. Ulangi dengan mencabut/melepas AirPods | Tetap pause | |
+| 19 | Play dari Control Center setelah interupsi | Setelah interupsi (butir 15) bila lagu tidak lanjut sendiri: buka Control Center lalu tekan play | Lagu jalan. Jika Control Center menampilkan "Tidak Diputar" dan play tidak bereaksi: buka SONORA, Pengaturan, Diagnostik, screenshot bagian **LOG AUDIO** dan kirim | |
+| 20 | Detik lagu | Buka Now Playing, sentuh slider lalu geser jari keluar layar / tarik pusat notifikasi saat menyentuh. Ulangi beberapa kali | Angka detik dan slider tetap berjalan sesuai lagu | |
+| 21 | Tombol lock screen | Kunci layar saat lagu main, nyalakan layar | Ada tombol sebelumnya/berikutnya (bukan +/-10 dtk) | |
 
 **Catatan:** Web Audio (EQ, ReplayGain, Visualizer) bisa ditangguhkan iOS saat layar terkunci. Karena itu aplikasi mematikannya otomatis (lihat pesan toast). Itu perilaku yang disengaja, bukan bug.

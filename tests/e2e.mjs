@@ -31,7 +31,7 @@ const setRow=async k=>{await nav('set');await p.click(`[data-s=${k}]`);await sle
 await p.goto(URLX,{waitUntil:'networkidle0'});await sleep(400);
 ok('Boot tanpa error JS',errs.length===0,errs.join(' | '));
 ok('Skeleton hilang (library selesai dimuat)',(await p.$$('.sk')).length===0);
-const want={home:'Beranda',lib:'Library',search:'Cari',pl:'Playlists',set:'Pengaturan'};let navOk=true,navInfo='';
+const want={home:'Beranda',lib:'Pustaka',search:'Cari',pl:'Playlist',set:'Pengaturan'};let navOk=true,navInfo='';
 for(const [k,v] of Object.entries(want)){await nav(k);const got=k==='search'?(await p.$eval('#q',e=>e.hidden)?'x':'Cari'):await ttl();if(got!==v){navOk=false;navInfo+=`${k}:${got} `}}
 ok('5 menu navigasi bisa dibuka',navOk,navInfo);
 // ---- 2. Import
@@ -112,7 +112,7 @@ await nav('lib');ok('Library bertahan setelah reload (3 lagu)',(await rows())===
 ok('Sesi terakhir dipulihkan (mini player)',!(await p.$eval('#mini',e=>e.hidden)));
 // ---- 12. PWA & offline
 await sleep(1500);const sw=await p.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();return{reg:!!r,c:await caches.keys()}});
-ok('Service worker aktif, cache sonora-v12',sw.reg&&sw.c.includes('sonora-v12'),JSON.stringify(sw));
+ok('Service worker aktif, cache sonora-v13',sw.reg&&sw.c.includes('sonora-v13'),JSON.stringify(sw));
 await p.reload({waitUntil:'networkidle0'});await sleep(500);await p.setOfflineMode(true);await p.reload({waitUntil:'domcontentloaded'}).catch(()=>{});await sleep(1200);
 ok('Offline: aplikasi & library tetap tampil',(await p.$$('#nav button')).length===5&&(await rows())>=0&&(await p.$$('.sk')).length===0);await p.setOfflineMode(false);
 // ---- 13. Layout sempit

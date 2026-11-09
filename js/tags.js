@@ -1,6 +1,6 @@
 // Tag, cover art, dan parser OGG/Opus/AIFF. Semua membaca potongan file saja.
 const dec=(b,e)=>new TextDecoder(['latin1','utf-16','utf-16be','utf-8'][e]||'utf-8').decode(b).replace(/\0+$/,'').replace(/^\uFEFF/,'');
-const norm=m=>{const t={title:m.TITLE,artist:m.ARTIST,album:m.ALBUM,albumArtist:m.ALBUMARTIST,track:m.TRACKNUMBER,disc:m.DISCNUMBER,genre:m.GENRE,year:(m.DATE||m.YEAR||'').slice(0,4)};
+const norm=m=>{const t={title:m.TITLE,artist:m.ARTIST,album:m.ALBUM,albumArtist:m.ALBUMARTIST,track:m.TRACKNUMBER,disc:m.DISCNUMBER,genre:m.GENRE,lyrics:(m.LYRICS||m.UNSYNCEDLYRICS||'').slice(0,2e4),year:(m.DATE||m.YEAR||'').slice(0,4)};
   Object.keys(t).forEach(k=>t[k]||delete t[k]);const g=k=>{const v=parseFloat(m[k]);return isNaN(v)?undefined:v};
   return{...t,rg:{track:g('REPLAYGAIN_TRACK_GAIN'),album:g('REPLAYGAIN_ALBUM_GAIN'),peak:g('REPLAYGAIN_TRACK_PEAK')}}};
 const vc=(d,o)=>{const m={};let n=d.getUint32(o,true);o+=4+n;n=d.getUint32(o,true);o+=4;
@@ -22,6 +22,7 @@ export async function id3(f,rd){const h=await rd(0,10);if(String.fromCharCode(h.
       if(e===1||e===2){while(i<b.length&&!(b[i]===0&&b[i+1]===0))i+=2;i+=2}else{while(i<b.length&&b[i])i++;i++}
       cover=new Blob([b.slice(i)],{type:mime.includes('/')?mime:'image/'+mime.toLowerCase()})}
     else if(id==='TXXX'){const [k,v]=dec(b.subarray(1),b[0]).split('\0');if(k&&/^replaygain/i.test(k))m[k.toUpperCase()]=v}
+    else if(id==='USLT'&&b.length>5){const e=b[0];let i=4;if(e===1||e===2){while(i<b.length&&!(b[i]===0&&b[i+1]===0))i+=2;i+=2}else{while(i<b.length&&b[i])i++;i++}m.LYRICS=dec(b.subarray(i),e)}
     else if(MAP[id])m[MAP[id]]=dec(b.subarray(1),b[0])}
   return{tags:norm(m),cover}}
 export function mp4tags(mv){const tx=(o,n)=>{let s='';for(let i=0;i<n;i++)s+=String.fromCharCode(mv.getUint8(o+i));return s};let p=-1;

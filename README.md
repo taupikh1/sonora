@@ -18,6 +18,49 @@ MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF dicek dengan `canPlayType` saat import
 ## Phase 8 (UI/UX) - ringkas
 Bottom nav (Home/Library/Search/Playlists/Settings), mini player di atas nav, Now Playing baru (artwork persegi, badge kualitas), tema Dark/Light/AMOLED/System + 5 aksen + warna kustom (localStorage), halaman Settings 6 kategori yang semuanya berfungsi, dialog konfirmasi/input kustom, skeleton, empty state, toast. File berubah: index.html, css/main.css, js/app.js, service-worker.js (cache v5).
 
+## Phase 16 (modularisasi tahap 1, QA, perbaikan bug)
+iPhone asli **NOT TESTED**. QA otomatis: `tests/qa_phase16.py` (Chromium, 20 pemeriksaan, 20/20 PASS): boot kosong, 5 halaman, duplikat impor, album beda artis, XSS lewat metadata, next/prev cepat, lirik txt/hapus, backup, hapus lagu saat diputar, layout 320x568 dan 390x844 (gelap/terang) tanpa overflow, offline.
+- **Bug ditemukan dan diperbaiki:** (1) blur latar Now Playing (Phase 14) melebarkan halaman 10 px sehingga bisa bergeser ke samping; blur kini di dalam kotak ber-clip. (2) Baris tombol kontrol Now Playing meluber 10 px di 390 px dan lebih di 320 px (bug lama); lebar tombol kini menyesuaikan layar.
+- **Modul:** `js/lrc.js` (parser lirik), `js/lib.js` (hitungan/pengelompokan library), `js/eq-data.js` (preset EQ), semuanya tanpa DOM dan masuk cache service worker.
+- Cache `sonora-v17`, versi 1.8. Belum dipecah: render/daftar, Now Playing, Pengaturan, UI EQ (saling terkait lewat state bersama; butuh refactor tahap 2 dengan modul state terpisah).
+
+## Struktur file
+`index.html` (kerangka), `css/main.css`, `js/app.js` (UI dan state), `js/audio-engine.js` (pemutaran, antrean, interupsi), `js/dsp.js` (Web Audio: EQ/ReplayGain), `js/metadata.js` + `js/tags.js` (baca tag), `js/storage.js` (IndexedDB), `js/utils.js`, `js/lrc.js`, `js/lib.js`, `js/eq-data.js`, `service-worker.js`, `tests/`.
+
+## Phase 15 (lirik dan pintasan)
+Diuji di Chromium headless; iPhone asli **NOT TESTED**.
+- **Lirik:** tombol Lirik di Now Playing (dan Lirik di menu ⋯). Sumber: file `.lrc` berwaktu atau `.txt` yang diimpor per lagu (disimpan di library, ikut backup), atau lirik tersemat di tag (ID3 USLT untuk MP3, LYRICS/UNSYNCEDLYRICS untuk FLAC/OGG/Opus). Lirik berwaktu menyorot baris berjalan dan baris bisa diketuk untuk seek. **Belum:** lirik tersemat MP4/M4A (©lyr), SYLT, dan pencarian lirik online (sengaja tidak, demi privasi).
+- **Pintasan Now Playing:** EQ dan Timer tidur langsung dari Now Playing.
+- Library dibaca ulang tagnya satu kali setelah update (skema info v4) agar lirik tersemat terdeteksi.
+- Cache `sonora-v15`, versi 1.6. Belum ada: Folders, fade in/out, pemecahan `app.js`.
+
+## Phase 14 (tampilan padat info ala HiBy, perbaikan data, bahasa)
+Diuji di Chromium headless (smoke test); sentuhan/swipe dan iPhone asli **NOT TESTED**.
+- **Beranda padat info:** 8 angka ringkas (lagu, artis, album, playlist, durasi, ukuran, Hi-Res, lossless/lossy), hitungan per format, rak horizontal bergambar (Baru ditambahkan, Sering diputar, Terakhir diputar, Favorit). *Sering diputar* memakai penghitung putar baru (`plays`).
+- **Albums/Artists:** grid cover (artis berbentuk lingkaran), diurut A-Z. Album dikelompokkan dari *artis album + nama album* (dua "Greatest Hits" beda artis tidak lagi menyatu). Halaman detail punya header cover dengan total durasi, ukuran, format, jumlah Hi-Res/lossless/lossy; lagu diurut menurut disc dan nomor track. Playlist juga memakai header yang sama.
+- **Daftar lagu:** dua baris info (artis - album; durasi - kualitas - favorit), ringkasan jumlah/durasi/ukuran, dan huruf A-Z lengket saat urutan Judul/Artis.
+- **Now Playing:** latar blur dari cover (gradien warna jika tanpa cover), kisi info 8 sel (format, sample, bit, bitrate, kanal, ukuran, gain, tahun; disembunyikan di layar pendek), seek bar custom. Swipe ke bawah pada artwork atau header menutupnya; swipe kiri/kanan pada artwork = berikutnya/sebelumnya.
+- **Mini player:** progress bar tipis; swipe kiri/kanan = berikutnya/sebelumnya, swipe ke atas = buka Now Playing.
+- **Playlist:** Impor m3u/m3u8 (dicocokkan lewat nama file; lagu yang tidak ada di pustaka dilewati).
+- **Bahasa:** menu, tab, Pengaturan, dan sheet ⋯ kini berbahasa Indonesia. Istilah teknis audio (Sample rate, Bit depth, Codec, ReplayGain, Bit-Perfect) sengaja tetap.
+- Belum ada: lirik, Folders, fade in/out, pemecahan `app.js` menjadi modul. Fade tidak mungkin di iOS tanpa Web Audio (lihat batasan di bawah).
+- Cache `sonora-v14`, versi 1.5. `tests/` belum disesuaikan dengan teks baru.
+
+## Phase 13 (interupsi, tombol play, detik lagu)
+Status: **READY WITH KNOWN LIMITATIONS** - diuji di Chromium headless (e2e 43/43 + `tests/phase13.mjs` 17/17). Perilaku iPhone asli **NOT TESTED** (lihat `TESTING_IPHONE.md` butir 15-21).
+- **Lanjut otomatis setelah interupsi** (aplikasi lain memakai audio, panggilan, dll). Aplikasi kini membedakan *pause oleh pengguna* (tombol, lock screen, sleep timer, akhir antrean) dari *pause oleh sistem*. Pause sistem dianggap interupsi bila Audio Session API (iOS 16.4+) berstatus `interrupted`, atau (tanpa API itu) halaman sedang tersembunyi. Lanjut dicoba saat audioSession selesai, saat halaman tampil lagi, `pageshow`, dan `focus`, dengan 4x percobaan ulang (0,5 / 1,2 / 2,5 / 5 dtk). Pause yang BUKAN interupsi (mis. earphone dicabut) sengaja tidak dilanjutkan. Batas: interupsi > 30 menit tidak dilanjutkan (`MAXGAP` di `audio-engine.js`). Bisa dimatikan: Pengaturan > Playback > "Lanjut otomatis setelah interupsi".
+- **Tombol play** (di aplikasi dan Control Center/lock screen) kini tidak jadi *pause* saat status masih interupsi, dan kegagalan `play()` ditampilkan sebagai toast yang benar (sebelumnya pesan "file rusak" untuk penolakan izin).
+- **Detik lagu nyangkut:** `seeking` hanya direset oleh event `change`; sentuhan slider yang dibatalkan membuat angka detik dan slider berhenti padahal lagu jalan. Sekarang direset juga oleh `pointercancel`/`touchcancel`/`blur`/timeout, ditambah penyegar cadangan 500 ms saat Now Playing terbuka.
+- **Crossfade:** menekan Next/Prev di tengah crossfade membuat volume lagu baru macet di nilai antara (mis. 30%). Diperbaiki.
+- **Restore sesi:** satu lagu yang sudah dihapus membatalkan pemulihan seluruh sesi terakhir. Sekarang id yang hilang dibuang saja.
+- **Hapus library** saat lagu main: metadata lock screen/antrean kini ikut dibersihkan (`clearAll`).
+- **Repeat:** mengganti mode Repeat membatalkan lagu berikutnya yang sudah disiapkan (sebelumnya, All -> Off di lagu terakhir bisa tetap loop ke lagu pertama pada mode Gapless).
+- **Pergantian lagu otomatis** kini selalu memakai lagu berikutnya yang sudah disiapkan (blob URL), bukan membaca IndexedDB di saat lagu habis. Tujuannya agar iOS tidak sempat menangguhkan halaman saat layar terkunci. NOT TESTED di iPhone.
+- **Lock screen iOS:** handler seek +/-10 dtk tidak dipasang di iOS supaya tombol sebelumnya/berikutnya yang tampil (dugaan, belum diverifikasi). Kecepatan yang diubah saat lagu berikutnya sudah disiapkan kini ikut diterapkan.
+- **Diagnostik:** ditambah status audioSession dan "LOG AUDIO" (40 peristiwa terakhir, bertahan walau halaman di-kill iOS) untuk melacak interupsi di perangkat. Log tidak ikut backup.
+- Cache service worker `sonora-v13`; versi aplikasi 1.4.
+- **Batasan yang tidak bisa diatasi dari web:** jika iOS mematikan halaman di background, Control Center menampilkan "Tidak Diputar" dan tombol play di sana tidak bisa menghidupkan SONORA; lagu terakhir dipulihkan (dalam keadaan pause) saat aplikasi dibuka lagi.
+
 ## Phase 12 (stabilisasi)
 - **Hotfix crash:** tombol Repeat (`#rp`) dan `cycleRepeat` hilang di Phase 11 sehingga seluruh aplikasi mati. Dikembalikan; error JS sekarang tampil sebagai toast.
 - **Tes otomatis:** `tests/e2e.mjs` (43 pemeriksaan: boot, navigasi, impor, play/pause/next/prev/repeat/shuffle, kecepatan, favorit, search, playlist, antrean, gapless, backup/restore, diagnostik, tema, PWA offline, layout 320-390px). Jalankan: `npm i --no-save puppeteer && node tests/e2e.mjs`. Hasil terakhir: 43/43 PASS (Chromium headless).
