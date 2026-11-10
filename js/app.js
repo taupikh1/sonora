@@ -12,7 +12,7 @@ const sleepFire=()=>{if(!timer)return;clearTimeout(timer);timer=null;timerEnd=0;
 const toast=(m,ms=4000)=>{const t=$('#toast');t.textContent=m;t.dataset.k=/^(Gagal|Tidak)/.test(m)?'err':'';t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),ms)};
 const urls=new Map(),curl=t=>t.cover?(urls.get(t.id)||urls.set(t.id,URL.createObjectURL(t.cover)).get(t.id)):null;st.art=curl;
 const cover=t=>L('art')!=='0'&&curl(t)?`<img class="cv" src="${curl(t)}" alt="" loading="lazy" decoding="async">`:`<div class="cv" style="--h:${hue(t.title+t.artist)}">${esc((t.title[0]||'♪').toUpperCase())}</div>`;
-const row=t=>`<div class="row"><button class="pl" data-play="${t.id}">${cover(t)}<span><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.album?' · '+esc(t.album):''}</small><small class="m">${[t.duration?fmt(t.duration):'',short(t.info),t.fav?'♥':''].filter(Boolean).join(' · ')}</small></span></button><button data-more="${t.id}" aria-label="Menu untuk ${esc(t.title)}">⋯</button></div>`;
+const row=t=>`<div class="row"><button class="pl" data-play="${esc(t.id)}">${cover(t)}<span><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.album?' · '+esc(t.album):''}</small><small class="m">${[t.duration?fmt(t.duration):'',short(t.info),t.fav?'♥':''].filter(Boolean).join(' · ')}</small></span></button><button data-more="${esc(t.id)}" aria-label="Menu untuk ${esc(t.title)}">⋯</button></div>`;
 const TT={home:'Beranda',lib:'Pustaka',search:'Cari',pl:'Playlist',set:'Pengaturan'};
 const sorted=()=>{const o=L('sort')||'added',a=[...st.lib.values()];return a.sort(o==='title'?(x,y)=>x.title.localeCompare(y.title):o==='artist'?(x,y)=>x.artist.localeCompare(y.artist)||x.title.localeCompare(y.title):(x,y)=>y.added-x.added)};
 const visible=()=>{let a=sorted();
@@ -39,7 +39,7 @@ const SH={added:()=>[...st.lib.values()].sort((x,y)=>y.added-x.added),
   top:()=>[...st.lib.values()].filter(t=>t.plays).sort((x,y)=>y.plays-x.plays||(y.played||0)-(x.played||0)),
   recent:()=>[...st.lib.values()].filter(t=>t.played).sort((x,y)=>y.played-x.played),
   fav:()=>[...st.lib.values()].filter(t=>t.fav)};
-const shelf=(t,k,lim=12)=>{const a=SH[k]();return a.length?`<h3 class="sec">${t}</h3><div class="shelf">${a.slice(0,lim).map(x=>`<button class="cd" data-play="${x.id}" data-sh="${k}">${cover(x)}<b>${esc(x.title)}</b><small>${esc(x.artist)}${k==='top'?' · '+x.plays+'×':''}</small></button>`).join('')}</div>`:''};
+const shelf=(t,k,lim=12)=>{const a=SH[k]();return a.length?`<h3 class="sec">${t}</h3><div class="shelf">${a.slice(0,lim).map(x=>`<button class="cd" data-play="${esc(x.id)}" data-sh="${k}">${cover(x)}<b>${esc(x.title)}</b><small>${esc(x.artist)}${k==='top'?' · '+x.plays+'×':''}</small></button>`).join('')}</div>`:''};
 const homeHtml=()=>{const all=[...st.lib.values()];if(!all.length)return emptyAll;const c=st.cur(),[hr,ll,ly]=qual(all),fm=new Map();
   for(const t of all){const f=(t.format||'?').toUpperCase();fm.set(f,(fm.get(f)||0)+1)}
   const cell=(b,s)=>`<div><b>${b}</b><small>${s}</small></div>`;
@@ -56,7 +56,7 @@ function render(){const m=$('#main'),pn=plOpen&&pls.find(x=>x.id===plOpen);docum
   if(!loaded)h=skel;
   else if(nav==='set')h=settingsHtml();
   else if(nav==='home')h=homeHtml();
-  else if(nav==='pl'&&!plOpen)h=`<button class="btn" data-newpl>+ Playlist baru</button><button class="btn" data-m3u>Impor m3u</button>`+(pls.map(p=>`<div class="row"><button class="pl" data-openpl="${p.id}"><div class="cv" style="--h:${hue(p.name)}">♫</div><span><b>${esc(p.name)}</b><small>${p.ids.length} lagu</small></span></button><button data-plmenu="${p.id}" aria-label="Menu playlist ${esc(p.name)}">⋯</button></div>`).join('')||'<div class="empty"><h2>Belum ada playlist</h2><p>Kelompokkan lagu favoritmu.</p></div>');
+  else if(nav==='pl'&&!plOpen)h=`<button class="btn" data-newpl>+ Playlist baru</button><button class="btn" data-m3u>Impor m3u</button>`+(pls.map(p=>`<div class="row"><button class="pl" data-openpl="${esc(p.id)}"><div class="cv" style="--h:${hue(p.name)}">♫</div><span><b>${esc(p.name)}</b><small>${p.ids.length} lagu</small></span></button><button data-plmenu="${esc(p.id)}" aria-label="Menu playlist ${esc(p.name)}">⋯</button></div>`).join('')||'<div class="empty"><h2>Belum ada playlist</h2><p>Kelompokkan lagu favoritmu.</p></div>');
   else if(nav==='lib'&&!grp&&(tab==='albums'||tab==='artists'))h=groups(tab==='albums'?'album':'artist');
   else{const v=visible();
     if(pn||grp)h=`<div class="bar"><button class="btn" data-back>← Kembali</button><button class="btn pri" data-playall>Putar semua</button></div>`+(v.length?dhead(v,grp?(grp.n||grp.v):pn?pn.name:''):'');
@@ -163,7 +163,7 @@ $('#seek').addEventListener('pointerup',()=>setTimeout(()=>seeking&&endSeek(),40
 if(dspOn())D.init(E.raw());refreshCfg();if(L('dsp_note')){localStorage.removeItem('dsp_note');setTimeout(()=>toast('EQ/ReplayGain/Visualizer dimatikan otomatis: iOS menangguhkan Web Audio saat layar terkunci.'),900)}
 audio.addEventListener('play',D.resume);
 (async()=>{try{const ts=await S.all('tracks');st.lib=new Map(ts.map(t=>[t.id,t]));pls=await S.all('playlists');loaded=true;render();
-  const l=await S.get('kv','last');if(L('resume')!=='0'&&l&&Array.isArray(l.ids)){const ids=l.ids.filter(i=>st.lib.has(i)),k=ids.indexOf(l.ids[l.i]);if(ids.length&&k>=0){let p=+l.pos||0;try{const z=JSON.parse(L('lp'));if(z&&z.id===ids[k]&&z.ts>=(l.ts||0))p=+z.pos||0}catch{}E.restore(ids,k,L('rempos')==='0'?0:p)}}for(const t of[...st.lib.values()])if(t.info?.v!==4)await ensureInfo(t);render();drawTrack()}catch(e){loaded=true;render();toast('Penyimpanan lokal tidak tersedia (mode privat?).')}
+  const l=await S.get('kv','last');if(L('resume')!=='0'&&l&&Array.isArray(l.ids)){const ids=l.ids.filter(i=>st.lib.has(i)),k=ids.indexOf(l.ids[l.i]);if(ids.length&&k>=0){let p=+l.pos||0;try{const z=JSON.parse(L('lp'));if(z&&z.id===ids[k]&&z.ts>=(l.ts||0))p=+z.pos||0}catch{}E.restore(ids,k,L('rempos')==='0'?0:p)}}for(const t of[...st.lib.values()])if(t.info?.v!==4)await ensureInfo(t);render();drawTrack();resumeBanner()}catch(e){loaded=true;render();toast('Penyimpanan lokal tidak tersedia (mode privat?).')}
   if('serviceWorker'in navigator){const had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)toast('SONORA diperbarui. Tutup dan buka lagi untuk memakai versi baru.')});navigator.serviceWorker.register('service-worker.js').catch(()=>{})}})();
 
 // ===== Phase 8: tema, navigasi, pengaturan, dialog =====
@@ -193,7 +193,7 @@ function settingsHtml(){const th=L('themeMode')||L('theme')||'system',ac=L('acce
   +g('Audio',r('bp','Mode Bit-Perfect',onoff(bp))+r('eq','Equalizer 10-band',bp?'Nonaktif (Bit-Perfect)':onoff(L('dsp_eq')==='1')+' · '+(L('eq_name')||'Flat'))+r('rg','ReplayGain (normalisasi volume)',bp?'Nonaktif (Bit-Perfect)':rg)+r('viz','Visualizer',bp?'Nonaktif (Bit-Perfect)':onoff(L('viz')==='1'))+r('vizm','Mode visualizer',L('viz_mode')==='wave'?'Waveform':'Spectrum')+r('ainfo','Informasi audio','Lihat'))
   +g('Pustaka',r('scan','Pindai musik','Pilih file')+r('sort','Urutan',{added:'Terbaru',title:'Judul',artist:'Artis'}[L('sort')||'added'])+r('art','Artwork album',onoff(L('art')!=='0'))+r('meta','Kelola metadata','Baca ulang tag · edit via ⋯'))
   +g('Penyimpanan',r('usage','Pemakaian penyimpanan',usage)+r('persist','Penyimpanan persisten','Minta')+r('tmp','Bersihkan data sementara','Bersihkan')+r('backup','Ekspor backup (daftar lagu, playlist, pengaturan)','Unduh')+r('restore','Pulihkan dari backup','Pilih file')+r('diag','Diagnostik perangkat','Lihat')+r('wipe','Hapus seluruh pustaka','Hapus'))
-  +g('Tentang',i('Versi aplikasi','SONORA 1.11')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
+  +g('Tentang',i('Versi aplikasi','SONORA 1.13')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
 const SA={reduce:()=>W('reduce',L('reduce')==='1'?'0':'1')||applyTheme(),
   gapless:()=>{W('gapless',L('gapless')==='1'?'0':'1');refreshCfg()},
   xf:()=>{if(ios||bpOn()||D.active())return toast(xfText());W('xf',{0:3,3:6,6:10,10:0}[+L('xf')||0]);refreshCfg()},
@@ -302,8 +302,12 @@ function showQueue(){const s=$('#sheet');
 $('#npq').onclick=showQueue;
 
 // Backup & restore (daftar lagu, favorit, edit metadata, playlist, pengaturan; file audio tidak ikut)
-const SKIPKEY=new Set(['dsp_note','alog']);
-function buildBackup(){const ls={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!SKIPKEY.has(k))ls[k]=localStorage.getItem(k)}
+// Phase 21: ID playlist harus format aman (alfanumerik/_/-); kunci pengaturan lewat whitelist ketat; lp/wh/alog tidak boleh dari backup.
+const SAFE_ID=/^[a-zA-Z0-9_-]{8,64}$/;
+const safeId=id=>{const s=String(id??'');return SAFE_ID.test(s)?s:crypto.randomUUID()};
+const ALLOWED_SETTINGS=new Set(['theme','themeMode','accent','accentCustom','art','sort','reduce','autoresume','rempos','resume','dsp_eq','dsp_rg','eq_bands','eq_name','eq_pre','eq_profiles','viz','viz_mode','xf','gapless','bp','speed','repeat','shuffle']);
+const SKIPKEY=new Set(['dsp_note','alog','lp','wh']);
+function buildBackup(){const ls={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!SKIPKEY.has(k)&&ALLOWED_SETTINGS.has(k))ls[k]=localStorage.getItem(k)}
   return{app:'sonora',version:2,created:new Date().toISOString(),
     tracks:[...st.lib.values()].map(({cover,ovCover,info,...t})=>t),
     playlists:pls.map(({id,name,ids})=>({id,name,ids})),settings:ls}}
@@ -318,16 +322,19 @@ async function restoreBackup(txt){let d;try{d=JSON.parse(txt)}catch{return toast
     await S.put('tracks',c);st.lib.set(c.id,c);n++}
   let np=0;const cur=new Map(pls.map(p=>[p.id,p]));
   for(const p of d.playlists){if(!p||typeof p.name!=='string'||!Array.isArray(p.ids))continue;
-    const ids=p.ids.map(i=>map.get(i)).filter(Boolean),ex=cur.get(p.id)||pls.find(x=>x.name===p.name);
-    await S.put('playlists',ex?{...ex,ids:[...new Set([...ex.ids,...ids])]}:{id:String(p.id||crypto.randomUUID()),name:p.name.slice(0,60),ids});np++}
+    const pid=safeId(p.id),ids=p.ids.map(i=>map.get(i)).filter(Boolean),ex=cur.get(pid)||pls.find(x=>x.name===p.name);
+    await S.put('playlists',ex?{...ex,ids:[...new Set([...ex.ids,...ids])]}:{id:pid,name:String(p.name).slice(0,60),ids});np++}
   pls=await S.all('playlists');
   let setN=0;if(d.settings&&typeof d.settings==='object'&&await ok('Pulihkan juga pengaturan (tema, EQ, kecepatan, dll)?')){
-    for(const[k,v]of Object.entries(d.settings))if(/^[a-z_A-Z]{1,24}$/.test(k)&&!SKIPKEY.has(k)&&typeof v==='string'&&v.length<8000){localStorage.setItem(k,v);setN++}
+    for(const[k,v]of Object.entries(d.settings))if(ALLOWED_SETTINGS.has(k)&&typeof v==='string'&&v.length<8000){localStorage.setItem(k,v);setN++}
     speed=+(localStorage.getItem('speed')||1)||1;applyTheme();applySpeed();refreshCfg()}
   render();drawTrack();
   toast(`${n} lagu dan ${np} playlist dipulihkan${setN?', pengaturan dipulihkan':''}.${miss?` ${miss} lagu belum ada di library: impor file audionya lalu pulihkan lagi.`:''}`,miss?9000:5000);
   if(setN&&dspOn()!==D.active())sync()}
 
+// Phase 20: sesi lama berakhir saat tersembunyi sambil memutar -> tawarkan lanjut satu ketukan (iOS melarang play otomatis tanpa sentuhan).
+function resumeBanner(){const lo=E.lostInfo();if(!lo||!st.cur())return;E.clearLost();const p=E.pos()||lo.pos,b=document.createElement('div');b.id='rb';b.innerHTML=`<span>Terhenti di background. Lanjut dari ${fmt(p)}?</span><button>Lanjut</button><button data-x aria-label="Tutup">✕</button>`;document.body.appendChild(b);
+  const done=()=>b.remove();b.querySelector('button').onclick=()=>{audio.play().catch(()=>{});done()};b.querySelector('[data-x]').onclick=done;setTimeout(done,30000);E.note('banner lanjut ditampilkan di '+fmt(p))}
 // Diagnostik perangkat: untuk uji manual di iPhone/Android (hasil bisa di-screenshot)
 const lpText=()=>{try{const z=JSON.parse(L('lp'));if(!z)return'-';return fmt(z.pos)+' ('+Math.round((Date.now()-z.ts)/1000)+' dtk lalu)'+(E.pending()?' · menunggu seek ke '+fmt(E.pending()):'')}catch{return'-'}};
 async function diagSheet(){const q=(f,d)=>{try{return f()}catch{return d}};
@@ -342,7 +349,7 @@ async function diagSheet(){const q=(f,d)=>{try{return f()}catch{return d}};
   // Phase 19: tombol salin seluruh log (maks 150 baris, dengan milidetik) supaya tidak perlu screenshot berulang.
   const cd=$('#sheet .card'),bt=document.createElement('button');bt.textContent='Salin log';bt.dataset.i='copy';cd.insertBefore(bt,cd.querySelector('[data-i=x]'));
   bt.onclick=async()=>{const pad=n=>String(n).padStart(3,'0'),T=t=>{const d=new Date(t);return d.toTimeString().slice(0,8)+'.'+pad(d.getMilliseconds())};
-    const txt=['SONORA 1.11 | cache '+ck.join(', '),navigator.userAgent,'audioSession: '+(navigator.audioSession?'ada, type '+navigator.audioSession.type+', state '+navigator.audioSession.state:'tidak ada'),'Posisi tersimpan: '+lpText(),'--- LOG AUDIO ('+E.events().length+' baris) ---',...E.events().map(([t,m])=>T(t)+'  '+m)].join('\n');
+    const txt=['SONORA 1.13 | cache '+ck.join(', '),navigator.userAgent,'audioSession: '+(navigator.audioSession?'ada, type '+navigator.audioSession.type+', state '+navigator.audioSession.state:'tidak ada'),'Posisi tersimpan: '+lpText(),'--- LOG AUDIO ('+E.events().length+' baris) ---',...E.events().map(([t,m])=>T(t)+'  '+m)].join('\n');
     let ok=false;try{await navigator.clipboard.writeText(txt);ok=true}catch{try{const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove()}catch{}}
     bt.textContent=ok?'Tersalin ✓':'Gagal menyalin';setTimeout(()=>{bt.textContent='Salin log'},2500)}}
 

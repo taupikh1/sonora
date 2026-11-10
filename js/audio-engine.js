@@ -82,8 +82,8 @@ function wire(a){
   a.onended=()=>{if(a!==cur)return;note('lagu habis ('+ctx()+')');if(st.repeat==='one'){a.currentTime=0;a.play();return}if(nxt){swap();return}if(pre){fast();return}next()};
   a.onseeking=()=>{if(a===cur)note('seek ke '+a.currentTime.toFixed(1)+' ('+ctx()+')')};
   a.onerror=()=>{if(a===cur&&st.cur())emit('error')};
-  a.onplay=()=>{if(a!==cur)return;note('play ('+ctx()+')');intr=0;cand=0;clearTimeout(rt);if(ms)ms.playbackState='playing';emit('state')};
-  a.onpause=()=>{if(a!==cur)return;note('pause ('+ctx()+', want='+want+', ended='+a.ended+')');if(ms)ms.playbackState='paused';if(want&&!a.ended)sysPause();emit('state')};
+  a.onplay=()=>{if(a!==cur)return;if(document.hidden)setTimeout(mark,0);note('play ('+ctx()+')');intr=0;cand=0;clearTimeout(rt);if(ms)ms.playbackState='playing';emit('state')};
+  a.onpause=()=>{if(a!==cur)return;if(document.hidden)setTimeout(mark,0);note('pause ('+ctx()+', want='+want+', ended='+a.ended+')');if(ms)ms.playbackState='paused';if(want&&!a.ended)sysPause();emit('state')};
   a.ontimeupdate=()=>{if(a!==cur)return;emit('time');if(ms&&isFinite(a.duration))try{ms.setPositionState({duration:a.duration,position:a.currentTime,playbackRate:a.playbackRate})}catch{}plan(a)}}
 // --- Interupsi & lanjut otomatis (Phase 13) ---
 // Dengan Audio Session API (Safari iOS 16.4+): interupsi = state 'interrupted'. Tanpa API itu: pause sistem saat halaman tersembunyi.
@@ -105,9 +105,14 @@ if(AS){try{AS.type='playback'}catch{}
     if(s==='interrupted'||blank){lastAS=Date.now();if(intr)weak=0;else if(want&&cand&&Date.now()-cand<3000){intr=cand;weak=0}
       if(blank){if(intr&&cur.paused){if(document.hidden)note('sinyal tanpa state saat tersembunyi: lanjut menunggu halaman tampil');else resume('audioSession tanpa state')}}}
     else resume('audioSession')})}
-document.addEventListener('visibilitychange',()=>{note('halaman '+(document.hidden?'tersembunyi':'tampil')+' (want='+want+', paused='+cur.paused+', intr='+(intr?1:0)+', pos='+(cur.currentTime||0).toFixed(1)+')');if(!document.hidden)resume('tampil')});
+let gone=0;const mark=()=>{if(gone)return;try{if(document.hidden)localStorage.setItem('wh',JSON.stringify({t:Date.now(),play:!!want&&!cur.paused,pos:cur.currentTime||0}));else localStorage.removeItem('wh')}catch{}};
+addEventListener('pagehide',e=>{note('pagehide (persisted='+e.persisted+')');if(!e.persisted){gone=1;try{localStorage.removeItem('wh')}catch{}}});
+document.addEventListener('visibilitychange',()=>{mark();note('halaman '+(document.hidden?'tersembunyi':'tampil')+' (want='+want+', paused='+cur.paused+', intr='+(intr?1:0)+', pos='+(cur.currentTime||0).toFixed(1)+')');if(!document.hidden)resume('tampil')});
 addEventListener('pageshow',()=>resume('pageshow'));addEventListener('focus',()=>resume('focus'));
-note('boot (audioSession '+(AS?'ada, '+AS.state:'tidak ada')+')');
+// Phase 20: penanda sesi. Saat halaman tersembunyi disimpan 'wh' (sedang main atau tidak). Bila saat boot penanda masih ada, sesi lama berakhir tersembunyi (iOS membuang halaman): app menawarkan lanjut.
+let lost=null;try{const w=JSON.parse(localStorage.getItem('wh')||'null');if(w&&w.play&&Date.now()-w.t<6*3600e3)lost={pos:+w.pos||0,ago:Math.round((Date.now()-w.t)/1000)};localStorage.removeItem('wh')}catch{}
+export const lostInfo=()=>lost,clearLost=()=>{lost=null};
+note('boot (audioSession '+(AS?'ada, '+AS.state:'tidak ada')+'); sesi sebelumnya: '+(lost?'berakhir tersembunyi saat memutar di '+lost.pos.toFixed(1)+' ('+lost.ago+' dtk lalu)':'normal / tidak sedang memutar'));
 wire(cur);
 const iosUA=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 if(ms)[['play',()=>{if(!audio.src)return;intr=0;note('Media Session: play');return audio.play().catch(e=>{note('Media Session play gagal: '+e.name);emit('blocked')})}],['pause',()=>{note('Media Session: pause');audio.pause()}],['previoustrack',prev],['nexttrack',next],
