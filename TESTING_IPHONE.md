@@ -36,5 +36,8 @@ Tes otomatis (`tests/e2e.mjs`) berjalan di Chromium, jadi **tidak** membuktikan 
 | 28 | Versi dan cache | Pengaturan → Tentang, lalu Diagnostik | Versi 1.11 dan cache sonora-v20 (bila tidak, tutup app dari app switcher dan buka lagi sampai berubah) | |
 | 29 | Log sosmed | Putar lagu, buka sosmed sampai lagu berhenti, tutup sosmed, buka SONORA, Diagnostik → Salin log, tempel ke chat | Log memuat baris play/pause/halaman tersembunyi/tampil/audioSession. Catat apakah lagu lanjut sendiri | |
 | 30 | Sinyal tanpa state | Ulangi butir 29 lalu cari baris "tanpa state, dianggap sinyal" dan "lanjut otomatis" | Ada sinyal lalu lanjut otomatis OK. Bila tidak ada baris pause sama sekali, iOS tidak mengirim pause ke SONORA | |
+| 31 | Banner lanjut | Putar lagu, buka sosmed beberapa menit sampai lagu berhenti, buka SONORA dari ikon | Bila iOS membuang halaman: muncul banner "Lanjut dari mm:ss"; ketuk Lanjut, lagu jalan dari posisi itu | |
+| 32 | Tanpa banner yang salah | Pause manual lalu buka app lain dan kembali; juga tutup app dari app switcher saat pause | Tidak ada banner. Cek Diagnostik: baris boot menyebut sesi sebelumnya normal; catat ada tidaknya baris pagehide | |
+| 33 | Diagnostik rapi | Pengaturan → Diagnostik, geser sampai bawah | Tombol Salin log dan Tutup terlihat penuh, tidak tertumpuk nav bawah | |
 
 **Catatan:** Web Audio (EQ, ReplayGain, Visualizer) bisa ditangguhkan iOS saat layar terkunci. Karena itu aplikasi mematikannya otomatis (lihat pesan toast). Itu perilaku yang disengaja, bukan bug.

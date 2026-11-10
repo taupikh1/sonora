@@ -18,6 +18,23 @@ MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF dicek dengan `canPlayType` saat import
 ## Phase 8 (UI/UX) - ringkas
 Bottom nav (Home/Library/Search/Playlists/Settings), mini player di atas nav, Now Playing baru (artwork persegi, badge kualitas), tema Dark/Light/AMOLED/System + 5 aksen + warna kustom (localStorage), halaman Settings 6 kategori yang semuanya berfungsi, dialog konfirmasi/input kustom, skeleton, empty state, toast. File berubah: index.html, css/main.css, js/app.js, service-worker.js (cache v5).
 
+## Phase 21 (security hardening & XSS remediation)
+Diuji di Chromium headless: `tests/phase21.py` 17/17 PASS, `tests/phase20.py` 9/9, `tests/phase19.py` 14/14, `tests/phase18.py` 6/6, `tests/phase17.py` 16/16. iPhone asli **NOT TESTED**.
+- **SON-001 (XSS lewat playlist ID di file backup):** ID playlist dari backup divalidasi dengan `SAFE_ID` (`/^[a-zA-Z0-9_-]{8,64}$/`). ID tidak valid diganti UUID baru. Semua ID yang masuk atribut HTML (`data-openpl`, `data-plmenu`, `data-play`, `data-more`) di-escape lewat `esc()`.
+- **SON-009 (validasi pengaturan backup):** restore settings memakai whitelist ketat (`ALLOWED_SETTINGS`). Kunci internal `lp`, `wh`, `alog`, `dsp_note` tidak bisa dimasukkan dari backup. `buildBackup` juga hanya mengekspor kunci yang diizinkan.
+- **`esc()` diperkuat:** kini menangani `& < > " '`.
+- Format backup lama tetap kompatibel (field tambahan diabaikan; ID invalid diganti tanpa gagal restore).
+- File berubah: `js/utils.js`, `js/app.js`, `service-worker.js` (cache `sonora-v22`), `tests/phase21.py`. Versi aplikasi 1.13.
+
+## Phase 20 (banner lanjut setelah halaman dibuang iOS, perapian Diagnostik)
+Diuji di Chromium headless: `tests/phase20.py` 9/9 PASS, `tests/phase19.py` 14/14, `tests/phase18.py` 6/6, `tests/phase17.py` 16/16, `tests/qa_phase16.py` lolos. iPhone asli **NOT TESTED** (lihat `TESTING_IPHONE.md` butir 31-32). Halaman yang dibuang iOS **disimulasikan** dengan membuka halaman baru tanpa event `pagehide`.
+- **Latar belakang:** log iPhone menunjukkan tidak ada pause yang sampai ke SONORA; halaman tersembunyi lalu `boot` 6-7 detik kemudian. Artinya iOS membuang halaman, dan lanjut otomatis dari dalam halaman tidak mungkin.
+- **Banner lanjut:** saat halaman tersembunyi, disimpan penanda sesi (sedang main atau tidak, posisi). Bila saat boot penanda masih ada dan sedang main, muncul banner \"Terhenti di background. Lanjut dari mm:ss?\" dengan tombol Lanjut (satu ketukan, karena iOS melarang play otomatis tanpa sentuhan). Banner hilang sendiri setelah 30 detik. Reload biasa, tutup tab, dan pause saat tersembunyi tidak memunculkan banner.
+- **Log:** baris `boot` kini memuat status sesi sebelumnya, dan ada baris `pagehide (persisted=...)` untuk mengetahui apakah iOS mengirimnya saat membuang halaman.
+- **Diagnostik:** layer sheet dinaikkan di atas nav bawah dan padding bawah kartu ditambah supaya tombol Tutup dan Salin log tidak menumpuk dengan nav. Penyebab pasti tumpukan di iPhone belum terbukti, perbaikan ini belum dicoba di perangkat asli.
+- **Belum dikerjakan:** virtualisasi daftar lagu, memecah `app.js`, memperbarui `tests/e2e.mjs` dan `tests/phase13.mjs`, pengelompokan ulang Pengaturan, dan fitur baru (playlist pintar, bookmark posisi, edit tag, statistik, gestur swipe).
+- Cache `sonora-v21`, versi 1.12.
+
 ## Phase 19 (log diagnostik untuk bug sosmed, statechange tanpa state)
 Diuji di Chromium headless: `tests/phase19.py` 14/14 PASS (audioSession TIRUAN dengan `state` undefined), `tests/phase18.py` 6/6, `tests/phase17.py` 16/16, `tests/qa_phase16.py` lolos. iPhone asli **NOT TESTED** (lihat `TESTING_IPHONE.md` butir 28-30).
 - **Temuan dari log iPhone:** `audioSession -> undefined` = API ada tetapi `state` kosong, jadi deteksi interupsi "kuat" (menunggu `interrupted`) tidak pernah aktif. Sebelumnya `statechange` tanpa state hanya dicatat.
