@@ -18,6 +18,15 @@ MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF dicek dengan `canPlayType` saat import
 ## Phase 8 (UI/UX) - ringkas
 Bottom nav (Home/Library/Search/Playlists/Settings), mini player di atas nav, Now Playing baru (artwork persegi, badge kualitas), tema Dark/Light/AMOLED/System + 5 aksen + warna kustom (localStorage), halaman Settings 6 kategori yang semuanya berfungsi, dialog konfirmasi/input kustom, skeleton, empty state, toast. File berubah: index.html, css/main.css, js/app.js, service-worker.js (cache v5).
 
+## Phase 19 (log diagnostik untuk bug sosmed, statechange tanpa state)
+Diuji di Chromium headless: `tests/phase19.py` 14/14 PASS (audioSession TIRUAN dengan `state` undefined), `tests/phase18.py` 6/6, `tests/phase17.py` 16/16, `tests/qa_phase16.py` lolos. iPhone asli **NOT TESTED** (lihat `TESTING_IPHONE.md` butir 28-30).
+- **Temuan dari log iPhone:** `audioSession -> undefined` = API ada tetapi `state` kosong, jadi deteksi interupsi "kuat" (menunggu `interrupted`) tidak pernah aktif. Sebelumnya `statechange` tanpa state hanya dicatat.
+- **Perubahan:** `statechange` tanpa `state` kini dianggap SINYAL interupsi (awal atau akhir tidak dibedakan). Pause sistem dalam 3 dtk setelah sinyal dihitung interupsi; bila sinyal datang saat halaman tampil dan pause sudah terjadi, lanjut otomatis dicoba; bila saat tersembunyi, menunggu halaman tampil.
+- **Log lebih lengkap (150 baris, bertahan walau halaman di-kill):** setiap `play`, `pause` (dengan `want` dan `ended`), `seek`, `lagu habis`, `halaman tersembunyi/tampil` (dengan `want`, `paused`, `intr`, posisi), dan `statechange`; semuanya memuat `hidden` dan posisi.
+- **Tombol \"Salin log\"** di Diagnostik: menyalin versi, cache, audioSession, posisi tersimpan, dan seluruh log dengan milidetik. Tampilan Diagnostik menunjukkan 30 baris terakhir.
+- **Belum:** jika iOS mematikan halaman (boot ulang beberapa detik setelah tersembunyi), pemutaran tidak bisa dilanjutkan dari dalam web; log hanya membuktikan hal itu. Tidak ada klaim bahwa bug sosmed sudah terselesaikan sebelum ada log iPhone.
+- Cache `sonora-v20`, versi 1.11.
+
 ## Phase 18 (pemulihan posisi yang tidak bisa macet)
 Diuji di Chromium headless: `tests/phase18.py` 6/6 PASS, `tests/phase17.py` 16/16, `tests/qa_phase16.py` lolos. Elemen audio iOS yang macet **disimulasikan** (metadata baru dimuat saat play, seek diabaikan, fragmen `#t=` diabaikan); iPhone asli **NOT TESTED** (lihat `TESTING_IPHONE.md` butir 22-27).
 - **Bug dari laporan:** ditutup di detik 13, dibuka lagi lalu play: lagu mulai dari awal, angka detik tidak jalan, geser seek tidak berpengaruh sampai ganti lagu. Dugaan penyebab (dari kode, belum terbukti di iPhone): Phase 17 mencoba seek dua kali berturut-turut (`loadedmetadata` dan `canplay`) sehingga elemen iOS bisa macet; angka detik terkunci karena status pending hanya dibersihkan oleh event `seeked`.

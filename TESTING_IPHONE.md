@@ -33,5 +33,8 @@ Tes otomatis (`tests/e2e.mjs`) berjalan di Chromium, jadi **tidak** membuktikan 
 | 25 | Pause oleh earphone | Putar lagu, lepas AirPods saat layar terkunci, nyalakan layar | Tetap pause (pause saat layar tampil tidak dilanjutkan). Catat jika malah lanjut lewat speaker | |
 | 26 | Seek setelah dipulihkan | Ulangi butir 22, lalu setelah lagu jalan geser slider ke menit 1 dan menit 2 | Lagu langsung pindah ke posisi itu, angka detik jalan | |
 | 27 | Pemulihan macet | Bila lagu tetap mulai dari awal atau seek tidak bereaksi: tunggu 10 detik, lalu Diagnostik, screenshot LOG AUDIO dan baris Posisi tersimpan | Lagu akhirnya sampai di posisi tersimpan, atau muncul pesan dan angka detik tetap jalan | |
+| 28 | Versi dan cache | Pengaturan → Tentang, lalu Diagnostik | Versi 1.11 dan cache sonora-v20 (bila tidak, tutup app dari app switcher dan buka lagi sampai berubah) | |
+| 29 | Log sosmed | Putar lagu, buka sosmed sampai lagu berhenti, tutup sosmed, buka SONORA, Diagnostik → Salin log, tempel ke chat | Log memuat baris play/pause/halaman tersembunyi/tampil/audioSession. Catat apakah lagu lanjut sendiri | |
+| 30 | Sinyal tanpa state | Ulangi butir 29 lalu cari baris "tanpa state, dianggap sinyal" dan "lanjut otomatis" | Ada sinyal lalu lanjut otomatis OK. Bila tidak ada baris pause sama sekali, iOS tidak mengirim pause ke SONORA | |
 
 **Catatan:** Web Audio (EQ, ReplayGain, Visualizer) bisa ditangguhkan iOS saat layar terkunci. Karena itu aplikasi mematikannya otomatis (lihat pesan toast). Itu perilaku yang disengaja, bukan bug.
