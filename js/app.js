@@ -193,7 +193,7 @@ function settingsHtml(){const th=L('themeMode')||L('theme')||'system',ac=L('acce
   +g('Audio',r('bp','Mode Bit-Perfect',onoff(bp))+r('eq','Equalizer 10-band',bp?'Nonaktif (Bit-Perfect)':onoff(L('dsp_eq')==='1')+' · '+(L('eq_name')||'Flat'))+r('rg','ReplayGain (normalisasi volume)',bp?'Nonaktif (Bit-Perfect)':rg)+r('viz','Visualizer',bp?'Nonaktif (Bit-Perfect)':onoff(L('viz')==='1'))+r('vizm','Mode visualizer',L('viz_mode')==='wave'?'Waveform':'Spectrum')+r('ainfo','Informasi audio','Lihat'))
   +g('Pustaka',r('scan','Pindai musik','Pilih file')+r('sort','Urutan',{added:'Terbaru',title:'Judul',artist:'Artis'}[L('sort')||'added'])+r('art','Artwork album',onoff(L('art')!=='0'))+r('meta','Kelola metadata','Baca ulang tag · edit via ⋯'))
   +g('Penyimpanan',r('usage','Pemakaian penyimpanan',usage)+r('persist','Penyimpanan persisten','Minta')+r('tmp','Bersihkan data sementara','Bersihkan')+r('backup','Ekspor backup (daftar lagu, playlist, pengaturan)','Unduh')+r('restore','Pulihkan dari backup','Pilih file')+r('diag','Diagnostik perangkat','Lihat')+r('wipe','Hapus seluruh pustaka','Hapus'))
-  +g('Tentang',i('Versi aplikasi','SONORA 1.10')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
+  +g('Tentang',i('Versi aplikasi','SONORA 1.11')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
 const SA={reduce:()=>W('reduce',L('reduce')==='1'?'0':'1')||applyTheme(),
   gapless:()=>{W('gapless',L('gapless')==='1'?'0':'1');refreshCfg()},
   xf:()=>{if(ios||bpOn()||D.active())return toast(xfText());W('xf',{0:3,3:6,6:10,10:0}[+L('xf')||0]);refreshCfg()},
@@ -337,8 +337,14 @@ async function diagSheet(){const q=(f,d)=>{try{return f()}catch{return d}};
     ['Mode',navigator.standalone||matchMedia('(display-mode: standalone)').matches?'Terpasang (Home Screen)':'Tab browser'],['Koneksi',navigator.onLine?'Online':'Offline'],
     ['PWA / OFFLINE'],['Service worker',sw?(sw.active?'Aktif':'Terdaftar'):'Tidak ada'],['Cache',ck.join(', ')||'-'],['Penyimpanan persisten',pe===null?'Tidak diketahui':pe?'Ya':'Tidak (minta di Pengaturan)'],
     ['FITUR'],['Media Session (lock screen)',navigator.mediaSession?'Ada':'Tidak ada'],['Web Audio',window.AudioContext||window.webkitAudioContext?'Ada':'Tidak ada'],['Audio Session API',navigator.audioSession?'Ada (type '+navigator.audioSession.type+', state '+navigator.audioSession.state+')':'Tidak ada'],['Web Audio saat ini',D.active()?'Aktif ('+D.state()+')':'Tidak dibuat'],
-    ['FORMAT (canPlayType)'],...fm,['LIBRARY'],['Jumlah lagu',st.lib.size+''],['Posisi tersimpan',lpText()],['Transisi lagu terakhir',gapText()],['LOG AUDIO (terbaru di bawah)'],...E.events().slice(-20).map(([t,m])=>[new Date(t).toTimeString().slice(0,8),m])],
-    'Hasil ini dari browser, bukan uji suara. Background playback, lock screen, dan gapless tetap harus dicoba langsung (lihat TESTING_IPHONE.md).')}
+    ['FORMAT (canPlayType)'],...fm,['LIBRARY'],['Jumlah lagu',st.lib.size+''],['Posisi tersimpan',lpText()],['Transisi lagu terakhir',gapText()],['LOG AUDIO (terbaru di bawah)'],...E.events().slice(-30).map(([t,m])=>[new Date(t).toTimeString().slice(0,8),m])],
+    'Hasil ini dari browser, bukan uji suara. Background playback, lock screen, dan gapless tetap harus dicoba langsung (lihat TESTING_IPHONE.md).');
+  // Phase 19: tombol salin seluruh log (maks 150 baris, dengan milidetik) supaya tidak perlu screenshot berulang.
+  const cd=$('#sheet .card'),bt=document.createElement('button');bt.textContent='Salin log';bt.dataset.i='copy';cd.insertBefore(bt,cd.querySelector('[data-i=x]'));
+  bt.onclick=async()=>{const pad=n=>String(n).padStart(3,'0'),T=t=>{const d=new Date(t);return d.toTimeString().slice(0,8)+'.'+pad(d.getMilliseconds())};
+    const txt=['SONORA 1.11 | cache '+ck.join(', '),navigator.userAgent,'audioSession: '+(navigator.audioSession?'ada, type '+navigator.audioSession.type+', state '+navigator.audioSession.state:'tidak ada'),'Posisi tersimpan: '+lpText(),'--- LOG AUDIO ('+E.events().length+' baris) ---',...E.events().map(([t,m])=>T(t)+'  '+m)].join('\n');
+    let ok=false;try{await navigator.clipboard.writeText(txt);ok=true}catch{try{const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove()}catch{}}
+    bt.textContent=ok?'Tersalin ✓':'Gagal menyalin';setTimeout(()=>{bt.textContent='Salin log'},2500)}}
 
 // Keyboard shortcuts
 document.addEventListener('keydown',e=>{

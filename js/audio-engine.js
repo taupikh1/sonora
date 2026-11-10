@@ -25,7 +25,8 @@ function guardSeek(v){clearTimeout(gs);const el=cur,u0=url,t0=Date.now();gs=setT
   note('seek ke '+v.toFixed(1)+' tidak berhasil, elemen dimuat ulang di posisi itu');const w=!el.paused;el.src=frag(v);arm(el,v);if(w)el.play().catch(()=>{})},2500)}
 // Log peristiwa audio (40 terakhir, bertahan walau halaman di-kill iOS) untuk Diagnostik.
 export const events=()=>{try{return JSON.parse(localStorage.getItem('alog'))||[]}catch{return[]}};
-export const note=m=>{try{const l=events();l.push([Date.now(),m]);localStorage.setItem('alog',JSON.stringify(l.slice(-40)))}catch{}};
+export const note=m=>{try{const l=events();l.push([Date.now(),m]);localStorage.setItem('alog',JSON.stringify(l.slice(-150)))}catch{}};
+const ctx=()=>'hidden='+document.hidden+', pos='+(cur.currentTime||0).toFixed(1);
 export const raw=()=>cur;
 export const cfg={xf:0,gapless:false,allow:false,auto:true};
 export const st={queue:[],i:-1,shuffle:false,repeat:'off',lib:new Map(),cur(){return this.lib.get(this.queue[this.i])}};
@@ -78,10 +79,11 @@ export function removeAt(i){if(i<0||i>=st.queue.length)return;queueChanged();
   return playAt(i<st.queue.length?i:st.queue.length-1,i<st.queue.length&&was)}
 function setMeta(t){if(!ms)return;ms.metadata=new MediaMetadata({title:t.title,artist:t.artist,album:t.album||'',artwork:[st.art?.(t)?{src:st.art(t)}:{src:'assets/icons/icon-512.png',sizes:'512x512',type:'image/png'}]})}
 function wire(a){
-  a.onended=()=>{if(a!==cur)return;if(st.repeat==='one'){a.currentTime=0;a.play();return}if(nxt){swap();return}if(pre){fast();return}next()};
+  a.onended=()=>{if(a!==cur)return;note('lagu habis ('+ctx()+')');if(st.repeat==='one'){a.currentTime=0;a.play();return}if(nxt){swap();return}if(pre){fast();return}next()};
+  a.onseeking=()=>{if(a===cur)note('seek ke '+a.currentTime.toFixed(1)+' ('+ctx()+')')};
   a.onerror=()=>{if(a===cur&&st.cur())emit('error')};
-  a.onplay=()=>{if(a!==cur)return;intr=0;cand=0;clearTimeout(rt);if(ms)ms.playbackState='playing';emit('state')};
-  a.onpause=()=>{if(a!==cur)return;if(ms)ms.playbackState='paused';if(want&&!a.ended)sysPause();emit('state')};
+  a.onplay=()=>{if(a!==cur)return;note('play ('+ctx()+')');intr=0;cand=0;clearTimeout(rt);if(ms)ms.playbackState='playing';emit('state')};
+  a.onpause=()=>{if(a!==cur)return;note('pause ('+ctx()+', want='+want+', ended='+a.ended+')');if(ms)ms.playbackState='paused';if(want&&!a.ended)sysPause();emit('state')};
   a.ontimeupdate=()=>{if(a!==cur)return;emit('time');if(ms&&isFinite(a.duration))try{ms.setPositionState({duration:a.duration,position:a.currentTime,playbackRate:a.playbackRate})}catch{}plan(a)}}
 // --- Interupsi & lanjut otomatis (Phase 13) ---
 // Dengan Audio Session API (Safari iOS 16.4+): interupsi = state 'interrupted'. Tanpa API itu: pause sistem saat halaman tersembunyi.
@@ -97,8 +99,13 @@ function attempt(why,n){if(!intr||!want||!cur.paused)return;
   Promise.resolve(cur.play()).then(()=>note(`lanjut otomatis OK (${why}, percobaan ${n+1})`),e=>{note(`lanjut otomatis gagal (${why}, #${n+1}): ${e.name}`);
     if(n<RETRY.length)rt=setTimeout(()=>attempt(why,n+1),RETRY[n]);else emit('resumefail')})}
 if(AS){try{AS.type='playback'}catch{}
-  AS.addEventListener('statechange',()=>{note('audioSession -> '+AS.state);if(AS.state==='interrupted'){lastAS=Date.now();if(intr)weak=0;else if(want&&cand&&Date.now()-cand<3000){intr=cand;weak=0}}else resume('audioSession')})}
-document.addEventListener('visibilitychange',()=>{note('halaman '+(document.hidden?'tersembunyi':'tampil'));if(!document.hidden)resume('tampil')});
+  // Phase 19: iPhone bisa mengirim statechange tanpa `state` (undefined). Itu dianggap SINYAL interupsi (awal atau akhir, tidak dibedakan): lastAS dicatat supaya pause sistem 3 dtk berikutnya dihitung interupsi.
+  // Bila tidak ada state dan halaman sedang tampil, coba lanjutkan (kemungkinan akhir interupsi); bila tersembunyi, tunggu halaman tampil.
+  AS.addEventListener('statechange',()=>{const s=AS.state,blank=s!=='active'&&s!=='interrupted'&&s!=='inactive';note('audioSession -> '+s+(blank?' (tanpa state, dianggap sinyal)':'')+' ('+ctx()+', want='+want+', paused='+cur.paused+')');
+    if(s==='interrupted'||blank){lastAS=Date.now();if(intr)weak=0;else if(want&&cand&&Date.now()-cand<3000){intr=cand;weak=0}
+      if(blank){if(intr&&cur.paused){if(document.hidden)note('sinyal tanpa state saat tersembunyi: lanjut menunggu halaman tampil');else resume('audioSession tanpa state')}}}
+    else resume('audioSession')})}
+document.addEventListener('visibilitychange',()=>{note('halaman '+(document.hidden?'tersembunyi':'tampil')+' (want='+want+', paused='+cur.paused+', intr='+(intr?1:0)+', pos='+(cur.currentTime||0).toFixed(1)+')');if(!document.hidden)resume('tampil')});
 addEventListener('pageshow',()=>resume('pageshow'));addEventListener('focus',()=>resume('focus'));
 note('boot (audioSession '+(AS?'ada, '+AS.state:'tidak ada')+')');
 wire(cur);
