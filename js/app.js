@@ -7,10 +7,11 @@ import {parseLrc,lyText} from './lrc.js';
 import {akey,gv,tsum,mb,qual} from './lib.js';
 import {PRE} from './eq-data.js';
 const {st,audio}=E,$=s=>document.querySelector(s);
-let nav='home',grp=null,loaded=false,tab='songs',q='',plOpen=null,pls=[],seeking=false,timer=null,lastSave=0;
+let nav='home',grp=null,loaded=false,tab='songs',q='',plOpen=null,pls=[],seeking=false,timer=null,timerEnd=0,lastSave=0,lastLp=0;
+const sleepFire=()=>{if(!timer)return;clearTimeout(timer);timer=null;timerEnd=0;audio.pause();render()};
 const toast=(m,ms=4000)=>{const t=$('#toast');t.textContent=m;t.dataset.k=/^(Gagal|Tidak)/.test(m)?'err':'';t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),ms)};
 const urls=new Map(),curl=t=>t.cover?(urls.get(t.id)||urls.set(t.id,URL.createObjectURL(t.cover)).get(t.id)):null;st.art=curl;
-const cover=t=>L('art')!=='0'&&curl(t)?`<img class="cv" src="${curl(t)}" alt="">`:`<div class="cv" style="--h:${hue(t.title+t.artist)}">${esc((t.title[0]||'♪').toUpperCase())}</div>`;
+const cover=t=>L('art')!=='0'&&curl(t)?`<img class="cv" src="${curl(t)}" alt="" loading="lazy" decoding="async">`:`<div class="cv" style="--h:${hue(t.title+t.artist)}">${esc((t.title[0]||'♪').toUpperCase())}</div>`;
 const row=t=>`<div class="row"><button class="pl" data-play="${t.id}">${cover(t)}<span><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.album?' · '+esc(t.album):''}</small><small class="m">${[t.duration?fmt(t.duration):'',short(t.info),t.fav?'♥':''].filter(Boolean).join(' · ')}</small></span></button><button data-more="${t.id}" aria-label="Menu untuk ${esc(t.title)}">⋯</button></div>`;
 const TT={home:'Beranda',lib:'Pustaka',search:'Cari',pl:'Playlist',set:'Pengaturan'};
 const sorted=()=>{const o=L('sort')||'added',a=[...st.lib.values()];return a.sort(o==='title'?(x,y)=>x.title.localeCompare(y.title):o==='artist'?(x,y)=>x.artist.localeCompare(y.artist)||x.title.localeCompare(y.title):(x,y)=>y.added-x.added)};
@@ -98,8 +99,7 @@ function addToPl(t){sheet('Tambah ke playlist',[['+ Playlist baru',async()=>{con
 async function removeTrack(t){if(!await ok(`Hapus "${t.title}" dari library?`))return;
   await S.del('tracks',t.id);await S.del('blobs',t.id);st.lib.delete(t.id);
   for(const p of pls)if(p.ids.includes(t.id))await S.put('playlists',{...p,ids:p.ids.filter(i=>i!==t.id)});
-  pls=await S.all('playlists');E.queueChanged();const cur=st.queue[st.i];st.queue=st.queue.filter(i=>i!==t.id);st.i=st.queue.indexOf(cur);
-  if(cur===t.id){audio.pause();audio.removeAttribute('src');$('#mini').hidden=true;$('#np').hidden=true}render()}
+  pls=await S.all('playlists');dropUrl(t.id);let qi;while((qi=st.queue.indexOf(t.id))>=0)await E.removeAt(qi);render()}
 const more=t=>sheet(t.title,[['Putar berikutnya',()=>E.playNext(t.id)],['Tambah ke antrean',()=>E.addQueue(t.id)],['Tambah ke playlist',()=>addToPl(t)],[t.fav?'Hapus dari Favorit':'Tambah ke Favorit',()=>saveTrack({...t,fav:!t.fav})],['Informasi audio',()=>audioInfo(t)],['Lirik',()=>{$('#np').hidden=false;$('#ly').hidden=false;if(st.cur()?.id!==t.id)E.setQueue([t.id],0);lyDraw()}],['Edit metadata',()=>editMeta(t)],['Hapus dari pustaka',()=>removeTrack(t)]]);
 $('#main').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.play){const v=d.sh?SH[d.sh]():visible();E.setQueue(v.map(t=>t.id),v.findIndex(t=>t.id===d.play))}
@@ -134,16 +134,19 @@ function drawTrack(){const t=st.cur();if(!t)return;$('#mini').hidden=false;$('#m
 function drawState(){markPlayed();const p=svg(audio.paused?IC.play:IC.pause,1);$('#pp').innerHTML=p;$('#mpp').innerHTML=p;$('#pp').dataset.s=audio.paused?'play':'pause';startViz();$('#np').classList.toggle('play',!audio.paused);
   $('#sh').classList.toggle('act',st.shuffle);$('#rp').classList.toggle('act',st.repeat!=='off');$('#rp').innerHTML=svg(IC.rep)+(st.repeat==='one'?'<b class="one">1</b>':'')}
 const sp=()=>{const s=$('#seek');s.style.setProperty('--p',s.value/10+'%')};
-function drawTime(){lyTick();const d=audio.duration;if(isFinite(d)&&d)$('#mpg').style.width=audio.currentTime/d*100+'%';if(!seeking&&isFinite(d)&&d){$('#seek').value=audio.currentTime/d*1000;sp()}if(!seeking)set('#cur',fmt(audio.currentTime));set('#tot',isFinite(d)?fmt(d):fmt(st.cur()?.duration||0))}
-E.setOnChange(k=>{if(k==='track')drawTrack();else if(k==='state')drawState();else if(k==='time'){drawTime();if(Date.now()-lastSave>5000){lastSave=Date.now();S.put('kv',{ids:st.queue,i:st.i,pos:audio.currentTime},'last')}}
-  else if(k==='cleared'){$('#mini').hidden=true;$('#np').hidden=true;S.del('kv','last');render()}
+function drawTime(){lyTick();const d0=audio.duration,d=isFinite(d0)&&d0?d0:(st.cur()?.duration||0),p=E.pos();if(d)$('#mpg').style.width=Math.min(100,p/d*100)+'%';if(!seeking&&d){$('#seek').value=Math.min(1000,p/d*1000);sp()}if(!seeking)set('#cur',fmt(p));set('#tot',fmt(d))}
+E.setOnChange(k=>{if(k==='track')drawTrack();else if(k==='state'){drawState();if(audio.paused)saveLast()}else if(k==='time'){drawTime();if(timer&&Date.now()>=timerEnd)sleepFire();if(Date.now()-lastLp>2000)lpSave();if(Date.now()-lastSave>5000)saveLast()}
+  else if(k==='cleared'){$('#mini').hidden=true;$('#np').hidden=true;S.del('kv','last');try{localStorage.removeItem('lp')}catch{}render()}
   else if(k==='blocked')toast('Pemutaran ditahan oleh sistem. Ketuk tombol play sekali lagi.')
   else if(k==='resumefail')toast('Tidak bisa melanjutkan otomatis setelah interupsi. Ketuk tombol play.')
   else if(k==='error'){const t=st.cur();toast(t?`Gagal memutar "${t.title}" (${t.format}). File rusak atau format tidak didukung browser ini.`:'Gagal memutar lagu.')}});
-const saveLast=()=>{if(st.i>=0&&st.queue.length&&audio.src){lastSave=Date.now();S.put('kv',{ids:st.queue,i:st.i,pos:audio.currentTime},'last').catch(()=>{})}};
+// Phase 17: posisi disimpan ganda. localStorage (sinkron, tidak hilang bila halaman ditangguhkan iOS) tiap 2 dtk + saat pause/background; IndexedDB (antrean) tiap 5 dtk.
+// E.pos() = posisi tersimpan yang menunggu seek bila metadata belum dimuat, supaya tidak tertimpa 0.
+const lpSave=()=>{lastLp=Date.now();try{const t=st.cur();if(t&&audio.src)localStorage.setItem('lp',JSON.stringify({id:t.id,pos:+E.pos().toFixed(1),ts:Date.now()}))}catch{}};
+const saveLast=()=>{if(st.i>=0&&st.queue.length&&audio.src){lastSave=Date.now();lpSave();S.put('kv',{ids:st.queue,i:st.i,pos:E.pos(),ts:Date.now()},'last').catch(()=>{})}};
 // Cadangan bila `timeupdate` tidak sampai (mis. setelah interupsi/kembali dari background): segarkan angka detik tiap 500 ms selama Now Playing terbuka.
 setInterval(()=>{if(!audio.paused&&!document.hidden&&!$('#np').hidden)drawTime()},500);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)saveLast();else{drawState();drawTime()}});addEventListener('pagehide',saveLast);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveLast();else{drawState();drawTime();if(timer&&Date.now()>=timerEnd)sleepFire()}});addEventListener('pagehide',saveLast);document.addEventListener('freeze',saveLast);
 $('#mo').onclick=()=>{$('#np').hidden=false;drawTime()};$('#npb').onclick=()=>$('#np').hidden=true;
 $('#pp').onclick=$('#mpp').onclick=E.toggle;$('#nx').onclick=$('#mnx').onclick=E.next;$('#pv').onclick=E.prev;
 $('#sh').onclick=()=>{E.toggleShuffle();drawState()};$('#rp').onclick=()=>{E.cycleRepeat();drawState()};
@@ -159,7 +162,7 @@ $('#seek').addEventListener('pointerup',()=>setTimeout(()=>seeking&&endSeek(),40
 if(dspOn())D.init(E.raw());refreshCfg();if(L('dsp_note')){localStorage.removeItem('dsp_note');setTimeout(()=>toast('EQ/ReplayGain/Visualizer dimatikan otomatis: iOS menangguhkan Web Audio saat layar terkunci.'),900)}
 audio.addEventListener('play',D.resume);
 (async()=>{try{const ts=await S.all('tracks');st.lib=new Map(ts.map(t=>[t.id,t]));pls=await S.all('playlists');loaded=true;render();
-  const l=await S.get('kv','last');if(L('resume')!=='0'&&l&&Array.isArray(l.ids)){const ids=l.ids.filter(i=>st.lib.has(i)),k=ids.indexOf(l.ids[l.i]);if(ids.length&&k>=0)E.restore(ids,k,L('rempos')==='0'?0:l.pos)}for(const t of[...st.lib.values()])if(t.info?.v!==4)await ensureInfo(t);render();drawTrack()}catch(e){loaded=true;render();toast('Penyimpanan lokal tidak tersedia (mode privat?).')}
+  const l=await S.get('kv','last');if(L('resume')!=='0'&&l&&Array.isArray(l.ids)){const ids=l.ids.filter(i=>st.lib.has(i)),k=ids.indexOf(l.ids[l.i]);if(ids.length&&k>=0){let p=+l.pos||0;try{const z=JSON.parse(L('lp'));if(z&&z.id===ids[k]&&z.ts>=(l.ts||0))p=+z.pos||0}catch{}E.restore(ids,k,L('rempos')==='0'?0:p)}}for(const t of[...st.lib.values()])if(t.info?.v!==4)await ensureInfo(t);render();drawTrack()}catch(e){loaded=true;render();toast('Penyimpanan lokal tidak tersedia (mode privat?).')}
   if('serviceWorker'in navigator){const had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)toast('SONORA diperbarui. Tutup dan buka lagi untuk memakai versi baru.')});navigator.serviceWorker.register('service-worker.js').catch(()=>{})}})();
 
 // ===== Phase 8: tema, navigasi, pengaturan, dialog =====
@@ -189,12 +192,12 @@ function settingsHtml(){const th=L('themeMode')||L('theme')||'system',ac=L('acce
   +g('Audio',r('bp','Mode Bit-Perfect',onoff(bp))+r('eq','Equalizer 10-band',bp?'Nonaktif (Bit-Perfect)':onoff(L('dsp_eq')==='1')+' · '+(L('eq_name')||'Flat'))+r('rg','ReplayGain (normalisasi volume)',bp?'Nonaktif (Bit-Perfect)':rg)+r('viz','Visualizer',bp?'Nonaktif (Bit-Perfect)':onoff(L('viz')==='1'))+r('vizm','Mode visualizer',L('viz_mode')==='wave'?'Waveform':'Spectrum')+r('ainfo','Informasi audio','Lihat'))
   +g('Pustaka',r('scan','Pindai musik','Pilih file')+r('sort','Urutan',{added:'Terbaru',title:'Judul',artist:'Artis'}[L('sort')||'added'])+r('art','Artwork album',onoff(L('art')!=='0'))+r('meta','Kelola metadata','Baca ulang tag · edit via ⋯'))
   +g('Penyimpanan',r('usage','Pemakaian penyimpanan',usage)+r('persist','Penyimpanan persisten','Minta')+r('tmp','Bersihkan data sementara','Bersihkan')+r('backup','Ekspor backup (daftar lagu, playlist, pengaturan)','Unduh')+r('restore','Pulihkan dari backup','Pilih file')+r('diag','Diagnostik perangkat','Lihat')+r('wipe','Hapus seluruh pustaka','Hapus'))
-  +g('Tentang',i('Versi aplikasi','SONORA 1.8')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
+  +g('Tentang',i('Versi aplikasi','SONORA 1.9')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
 const SA={reduce:()=>W('reduce',L('reduce')==='1'?'0':'1')||applyTheme(),
   gapless:()=>{W('gapless',L('gapless')==='1'?'0':'1');refreshCfg()},
   xf:()=>{if(ios||bpOn()||D.active())return toast(xfText());W('xf',{0:3,3:6,6:10,10:0}[+L('xf')||0]);refreshCfg()},
   autoresume:()=>{W('autoresume',L('autoresume')==='0'?'1':'0');refreshCfg()},resume:()=>W('resume',L('resume')==='0'?'1':'0'),rempos:()=>W('rempos',L('rempos')==='0'?'1':'0'),
-  sleep:()=>sheet('Timer tidur',[...[15,30,45,60].map(m=>[`${m} menit`,()=>{clearTimeout(timer);timer=setTimeout(()=>{audio.pause();timer=null;render()},m*6e4);toast(`Musik berhenti dalam ${m} menit (best-effort saat background).`);render()}]),['Matikan',()=>{clearTimeout(timer);timer=null;render()}]]),
+  sleep:()=>sheet('Timer tidur',[...[15,30,45,60].map(m=>[`${m} menit`,()=>{clearTimeout(timer);timerEnd=Date.now()+m*6e4;timer=setTimeout(sleepFire,m*6e4);toast(`Musik berhenti dalam ${m} menit (best-effort saat background).`);render()}]),['Matikan',()=>{clearTimeout(timer);timer=null;render()}]]),
   bp:()=>{W('bp',bpOn()?'0':'1');refreshCfg();applySpeed();if(dspOn()!==D.active())sync()},
   eq:()=>bpOn()?toast('Dinonaktifkan karena Bit-Perfect Mode aktif.'):eqSheet(),
   rg:()=>{if(bpOn())return toast('Dinonaktifkan karena Bit-Perfect Mode aktif.');W('dsp_rg',{off:'track',track:'album',album:'off'}[L('dsp_rg')||'off']);toast('ReplayGain memakai tag di file; lagu tanpa tag tidak diubah.');sync()},
@@ -202,12 +205,12 @@ const SA={reduce:()=>W('reduce',L('reduce')==='1'?'0':'1')||applyTheme(),
   sort:()=>W('sort',{added:'title',title:'artist',artist:'added'}[L('sort')||'added']),art:()=>W('art',L('art')==='0'?'1':'0'),
   meta:async()=>{toast('Membaca ulang tag...');for(const t of st.lib.values()){if(t.info)t.info.v=0;await ensureInfo(t)}toast('Metadata diperbarui.');drawTrack()},
   persist:async()=>toast(await navigator.storage?.persist?.()?'Penyimpanan persisten aktif.':'Browser tidak memberi penyimpanan persisten.'),
-  tmp:async()=>{if(!await ok('Bersihkan data sementara (cache cover & posisi terakhir)? Library tetap aman.'))return;urls.forEach(u=>URL.revokeObjectURL(u));urls.clear();await S.del('kv','last');toast('Data sementara dibersihkan.');drawTrack()},
+  tmp:async()=>{if(!await ok('Bersihkan data sementara (cache cover & posisi terakhir)? Library tetap aman.'))return;urls.forEach(u=>URL.revokeObjectURL(u));urls.clear();await S.del('kv','last');try{localStorage.removeItem('lp')}catch{}toast('Data sementara dibersihkan.');drawTrack()},
   backup:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(buildBackup())],{type:'application/json'}));a.download='sonora-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1e4);toast('Backup berisi daftar lagu, playlist, favorit, edit metadata, dan pengaturan. File audio tidak ikut.',6000)},
   restore:()=>{const i=document.createElement('input');i.type='file';i.accept='application/json,.json';i.onchange=async()=>{const f=i.files[0];if(f)await restoreBackup(await f.text())};i.click()},
   diag:()=>diagSheet(),
   speed:()=>{if(bpOn())return toast('Dinonaktifkan karena Bit-Perfect Mode aktif.');sheet('Kecepatan putar',SPEEDS.map(v=>[+v.toFixed(2)+'x'+(v===1?' (normal)':'')+(v===speed?'  ✓':''),()=>setSpeedV(v)]))},
-  wipe:async()=>{if(!await ok('Hapus SEMUA lagu dan playlist dari browser ini? Tindakan ini tidak bisa dibatalkan.'))return;E.clearAll();for(const s of['tracks','blobs','playlists','kv'])await S.clear(s);st.lib.clear();urls.forEach(u=>URL.revokeObjectURL(u));urls.clear();pls=[];$('#mini').hidden=true;$('#np').hidden=true;toast('Library dihapus.')}};
+  wipe:async()=>{if(!await ok('Hapus SEMUA lagu dan playlist dari browser ini? Tindakan ini tidak bisa dibatalkan.'))return;E.clearAll();for(const s of['tracks','blobs','playlists','kv'])await S.clear(s);st.lib.clear();urls.forEach(u=>URL.revokeObjectURL(u));urls.clear();pls=[];try{localStorage.removeItem('lp')}catch{}$('#mini').hidden=true;$('#np').hidden=true;toast('Library dihapus.')}};
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||!$('#dlg').hidden)return;if(!$('#sheet').hidden)$('#sheet').hidden=true;else if(!$('#np').hidden)$('#np').hidden=true});
 
 // ===== Phase 10: ikon, EQ 10-band + preset/profil, ReplayGain info, gapless info, visualizer, editor metadata =====
@@ -303,12 +306,14 @@ function buildBackup(){const ls={};for(let i=0;i<localStorage.length;i++){const 
   return{app:'sonora',version:2,created:new Date().toISOString(),
     tracks:[...st.lib.values()].map(({cover,ovCover,info,...t})=>t),
     playlists:pls.map(({id,name,ids})=>({id,name,ids})),settings:ls}}
+// Phase 17: hanya kunci metadata yang dikenal yang boleh masuk dari file backup (dulu objek `ov` disalin utuh, bisa menimpa id/cover/info).
+const cleanOv=o=>{if(!o||typeof o!=='object')return null;const r={};for(const k of['title','artist','album','genre','year'])if(typeof o[k]==='string')r[k]=o[k].slice(0,120);return Object.keys(r).length?r:null};
 async function restoreBackup(txt){let d;try{d=JSON.parse(txt)}catch{return toast('Gagal: file bukan JSON yang valid.')}
   if(!d||d.app!=='sonora'||!Array.isArray(d.tracks)||!Array.isArray(d.playlists))return toast('Gagal: ini bukan file backup SONORA.');
   const key=t=>t.fname+'|'+t.size,have=new Map([...st.lib.values()].map(t=>[key(t),t])),map=new Map();let n=0,miss=0;
   for(const b of d.tracks){const t=b&&have.get(key(b));if(!t){miss++;continue}map.set(b.id,t.id);
-    const m={};for(const k of['title','artist','album','genre','year','played','plays','lrc'])if(typeof b[k]==='string'&&b[k]||(k==='played'||k==='plays')&&typeof b[k]==='number')m[k]=b[k];
-    const c={...t,...m,fav:!!b.fav};if(b.ov&&typeof b.ov==='object')c.ov=b.ov;
+    const m={};for(const k of['title','artist','album','genre','year','played','plays','lrc'])if(typeof b[k]==='string'&&b[k]||(k==='played'||k==='plays')&&typeof b[k]==='number')m[k]=typeof b[k]==='string'?b[k].slice(0,k==='lrc'?2e5:200):b[k];
+    const c={...t,...m,fav:!!b.fav};const ov=cleanOv(b.ov);if(ov)c.ov=ov;
     await S.put('tracks',c);st.lib.set(c.id,c);n++}
   let np=0;const cur=new Map(pls.map(p=>[p.id,p]));
   for(const p of d.playlists){if(!p||typeof p.name!=='string'||!Array.isArray(p.ids))continue;
@@ -323,6 +328,7 @@ async function restoreBackup(txt){let d;try{d=JSON.parse(txt)}catch{return toast
   if(setN&&dspOn()!==D.active())sync()}
 
 // Diagnostik perangkat: untuk uji manual di iPhone/Android (hasil bisa di-screenshot)
+const lpText=()=>{try{const z=JSON.parse(L('lp'));if(!z)return'-';return fmt(z.pos)+' ('+Math.round((Date.now()-z.ts)/1000)+' dtk lalu)'+(E.pending()?' · menunggu seek ke '+fmt(E.pending()):'')}catch{return'-'}};
 async function diagSheet(){const q=(f,d)=>{try{return f()}catch{return d}};
   const sw=await q(()=>navigator.serviceWorker.getRegistration(),null),ck=await q(()=>caches.keys(),[]),pe=await q(()=>navigator.storage.persisted(),null),a=new Audio();
   const fm=[...new Set(Object.entries(MIME).map(([e,m])=>[e,a.canPlayType(m)||'tidak']))].map(([e,v])=>[e.toUpperCase(),v==='probably'?'Didukung':v==='maybe'?'Mungkin':'Tidak didukung']);
@@ -330,7 +336,7 @@ async function diagSheet(){const q=(f,d)=>{try{return f()}catch{return d}};
     ['Mode',navigator.standalone||matchMedia('(display-mode: standalone)').matches?'Terpasang (Home Screen)':'Tab browser'],['Koneksi',navigator.onLine?'Online':'Offline'],
     ['PWA / OFFLINE'],['Service worker',sw?(sw.active?'Aktif':'Terdaftar'):'Tidak ada'],['Cache',ck.join(', ')||'-'],['Penyimpanan persisten',pe===null?'Tidak diketahui':pe?'Ya':'Tidak (minta di Pengaturan)'],
     ['FITUR'],['Media Session (lock screen)',navigator.mediaSession?'Ada':'Tidak ada'],['Web Audio',window.AudioContext||window.webkitAudioContext?'Ada':'Tidak ada'],['Audio Session API',navigator.audioSession?'Ada (type '+navigator.audioSession.type+', state '+navigator.audioSession.state+')':'Tidak ada'],['Web Audio saat ini',D.active()?'Aktif ('+D.state()+')':'Tidak dibuat'],
-    ['FORMAT (canPlayType)'],...fm,['LIBRARY'],['Jumlah lagu',st.lib.size+''],['Transisi lagu terakhir',gapText()],['LOG AUDIO (terbaru di bawah)'],...E.events().slice(-14).map(([t,m])=>[new Date(t).toTimeString().slice(0,8),m])],
+    ['FORMAT (canPlayType)'],...fm,['LIBRARY'],['Jumlah lagu',st.lib.size+''],['Posisi tersimpan',lpText()],['Transisi lagu terakhir',gapText()],['LOG AUDIO (terbaru di bawah)'],...E.events().slice(-20).map(([t,m])=>[new Date(t).toTimeString().slice(0,8),m])],
     'Hasil ini dari browser, bukan uji suara. Background playback, lock screen, dan gapless tetap harus dicoba langsung (lihat TESTING_IPHONE.md).')}
 
 // Keyboard shortcuts

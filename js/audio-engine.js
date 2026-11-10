@@ -5,26 +5,30 @@ const mk=()=>{const a=new Audio();a.preload='auto';a.defaultPlaybackRate=a.playb
 let cur=mk(),nxt=null,oldEl=null,url,nxtUrl,ni=-1,pre=null,tm=0,iv=0,prepping=false,emit=()=>{};
 // Phase 13: `want` = aplikasi/pengguna MAU memutar (diset lewat audio.play()/audio.pause()). Jika elemen ter-pause padahal want=true dan bukan karena lagu habis,
 // berarti dijeda sistem (interupsi: aplikasi lain, panggilan, dll). `intr` = waktu interupsi dimulai (0 = tidak sedang terinterupsi).
-let want=false,intr=0,cand=0,lastAS=0,rt=0;
-const AS=navigator.audioSession,MAXGAP=30*60e3,RETRY=[500,1200,2500,5000];
+let want=false,intr=0,cand=0,lastAS=0,rt=0,weak=0,pend=0,orig=null;
+const AS=navigator.audioSession,MAXGAP=30*60e3,WEAKGAP=15*60e3,RETRY=[500,1200,2500,5000];
 export const audio=new Proxy({},{get:(_,k)=>{if(k==='play')return()=>{want=true;return cur.play()};if(k==='pause')return()=>{want=false;intr=0;cand=0;clearTimeout(rt);cur.pause()};
-  const v=cur[k];return typeof v==='function'?v.bind(cur):v},set:(_,k,v)=>(cur[k]=v,true)});
+  const v=cur[k];return typeof v==='function'?v.bind(cur):v},set:(_,k,v)=>{if(k==='currentTime')pend=0;cur[k]=v;return true}});
+// Phase 17: `pend` = posisi tersimpan yang belum berhasil di-seek (iOS sering belum memuat metadata sebelum play). Selama pend>0, posisi yang disimpan/ditampilkan adalah pend, bukan currentTime (yang masih 0).
+export const pos=()=>pend||cur.currentTime,pending=()=>pend;
 // Log peristiwa audio (40 terakhir, bertahan walau halaman di-kill iOS) untuk Diagnostik.
 export const events=()=>{try{return JSON.parse(localStorage.getItem('alog'))||[]}catch{return[]}};
 export const note=m=>{try{const l=events();l.push([Date.now(),m]);localStorage.setItem('alog',JSON.stringify(l.slice(-40)))}catch{}};
 export const raw=()=>cur;
 export const cfg={xf:0,gapless:false,allow:false,auto:true};
 export const st={queue:[],i:-1,shuffle:false,repeat:'off',lib:new Map(),cur(){return this.lib.get(this.queue[this.i])}};
+try{const r=localStorage.getItem('repeat');if(r==='all'||r==='one')st.repeat=r;st.shuffle=localStorage.getItem('shuffle')==='1'}catch{}
+const keep=()=>{try{localStorage.setItem('repeat',st.repeat);localStorage.setItem('shuffle',st.shuffle?'1':'0')}catch{}};
 export const setOnChange=f=>emit=f;
 const ms=navigator.mediaSession,dual=()=>cfg.allow&&(cfg.xf>0||cfg.gapless);
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-export function setQueue(ids,start=0){let q=[...ids];if(st.shuffle){const f=q.splice(start,1);q=[...f,...shuf(q)];start=0}st.queue=q;return playAt(start)}
+export function setQueue(ids,start=0){let q=[...ids];orig=st.shuffle?[...ids]:null;if(st.shuffle){const f=q.splice(start,1);q=[...f,...shuf(q)];start=0}st.queue=q;return playAt(start)}
 const reset=()=>{if(cur.volume!==1)cur.volume=1;if(pre){URL.revokeObjectURL(pre.url);pre=null}clearTimeout(tm);tm=0;clearInterval(iv);iv=0;if(oldEl){oldEl.pause();oldEl.removeAttribute('src');oldEl=null}if(nxt){nxt.removeAttribute('src');URL.revokeObjectURL(nxtUrl);nxt=null}};
 export async function playAt(i,play=true,pos=0){
-  if(i<0||i>=st.queue.length)return;reset();st.i=i;const t=st.cur();
+  if(i<0||i>=st.queue.length)return;reset();st.i=i;pend=0;const t=st.cur();
   const b=t&&await get('blobs',t.id);if(!b){want=false;emit('error');return}
   if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(b);audio.src=url;intr=0;cand=0;want=play;
-  if(pos)audio.addEventListener('loadedmetadata',()=>{audio.currentTime=pos},{once:true});
+  if(pos>0){const el=cur;pend=pos;const go=()=>{if(cur!==el||!pend)return;try{el.currentTime=pend}catch{}};el.addEventListener('loadedmetadata',go);el.addEventListener('canplay',go);el.addEventListener('seeked',()=>{if(cur===el)pend=0})}
   setMeta(t);emit('track');
   if(play)try{await audio.play()}catch(e){if(e.name==='NotAllowedError'){note('play diblokir browser (NotAllowedError)');emit('blocked')}else if(e.name!=='AbortError')emit('error')}}
 async function prep(){prepping=true;try{const me=st.i,i=me+1<st.queue.length?me+1:st.repeat==='all'?0:-1;
@@ -45,8 +49,10 @@ export const next=()=>{if(st.i+1<st.queue.length)playAt(st.i+1);else if(st.repea
 export const prev=()=>{if(audio.currentTime>3||st.i<=0)audio.currentTime=0;else playAt(st.i-1)};
 export const toggle=()=>{if(!audio.src)return;if(audio.paused||intr){intr=0;return audio.play().catch(e=>{note('toggle play gagal: '+e.name);if(e.name!=='AbortError')emit('blocked')})}audio.pause()};
 export const setSpeed=r=>{spd=Math.max(0.5,Math.min(2,r||1));cur.defaultPlaybackRate=cur.playbackRate=spd;if(nxt)nxt.defaultPlaybackRate=nxt.playbackRate=spd};
-export const cycleRepeat=()=>{queueChanged();st.repeat=st.repeat==='off'?'all':st.repeat==='all'?'one':'off'};
-export const toggleShuffle=()=>{queueChanged();st.shuffle=!st.shuffle;if(st.shuffle){const h=st.queue.slice(0,st.i+1);st.queue=[...h,...shuf(st.queue.slice(st.i+1))]}};
+export const cycleRepeat=()=>{queueChanged();st.repeat=st.repeat==='off'?'all':st.repeat==='all'?'one':'off';keep()};
+export const toggleShuffle=()=>{queueChanged();st.shuffle=!st.shuffle;keep();
+  if(st.shuffle){orig=[...st.queue];const h=st.queue.slice(0,st.i+1);st.queue=[...h,...shuf(st.queue.slice(st.i+1))]}
+  else if(orig){const cid=st.queue[st.i],rest=[...st.queue],q=[];for(const x of orig){const k=rest.indexOf(x);if(k>=0){q.push(x);rest.splice(k,1)}}q.push(...rest);st.queue=q;const k=q.indexOf(cid);if(k>=0)st.i=k;orig=null}};
 export function queueChanged(){if(pre){URL.revokeObjectURL(pre.url);pre=null}clearTimeout(tm);tm=0;if(nxt){nxt.removeAttribute('src');URL.revokeObjectURL(nxtUrl);nxt=null}}
 export const playNext=id=>{if(st.i<0)return setQueue([id]);queueChanged();st.queue.splice(st.i+1,0,id)};
 export const addQueue=id=>{if(st.i<0)return setQueue([id]);queueChanged();st.queue.push(id)};
@@ -68,9 +74,10 @@ function wire(a){
 // --- Interupsi & lanjut otomatis (Phase 13) ---
 // Dengan Audio Session API (Safari iOS 16.4+): interupsi = state 'interrupted'. Tanpa API itu: pause sistem saat halaman tersembunyi.
 // Pause karena hal lain (mis. earphone dicabut) sengaja TIDAK dilanjutkan otomatis.
-const isIntr=()=>AS?(AS.state==='interrupted'||Date.now()-lastAS<3000):document.hidden;
-function sysPause(){cand=Date.now();if(isIntr()){intr=cand;note('pause oleh sistem = interupsi (audioSession='+(AS?AS.state:'n/a')+', hidden='+document.hidden+')')}else note('pause oleh sistem, BUKAN interupsi (audioSession='+(AS?AS.state:'n/a')+') - tidak dilanjutkan otomatis')}
-function resume(why){if(!intr||!want||!cfg.auto||!cur.src)return;if(!cur.paused){intr=0;return}
+// Phase 17: interupsi 'kuat' = audioSession melapor interrupted. Interupsi 'lemah' = iOS mem-pause saat halaman tersembunyi tanpa laporan audioSession; hanya dilanjutkan bila halaman kembali tampil dalam 15 menit.
+function sysPause(){cand=Date.now();const strong=AS?(AS.state==='interrupted'||Date.now()-lastAS<3000):false;if(strong||document.hidden){intr=cand;weak=strong?0:1;note('pause oleh sistem = interupsi '+(strong?'(dilaporkan audioSession)':'(lemah: halaman tersembunyi)')+' audioSession='+(AS?AS.state:'n/a')+', hidden='+document.hidden)}else note('pause oleh sistem, BUKAN interupsi (audioSession='+(AS?AS.state:'n/a')+') - tidak dilanjutkan otomatis')}
+function resume(why){if(!intr||!want||!cfg.auto||!cur.src)return;if(!cur.paused){intr=0;weak=0;return}
+  if(weak&&Date.now()-intr>WEAKGAP){note('lanjut otomatis dibatalkan: jeda lemah lebih dari 15 menit');intr=0;weak=0;return}
   if(Date.now()-intr>MAXGAP){note('lanjut otomatis dibatalkan: interupsi lebih dari 30 menit');intr=0;return}
   if(AS&&AS.state==='interrupted'){note('lanjut ditunda ('+why+'): audioSession masih interrupted');return}
   clearTimeout(rt);attempt(why,0)}
@@ -78,7 +85,7 @@ function attempt(why,n){if(!intr||!want||!cur.paused)return;
   Promise.resolve(cur.play()).then(()=>note(`lanjut otomatis OK (${why}, percobaan ${n+1})`),e=>{note(`lanjut otomatis gagal (${why}, #${n+1}): ${e.name}`);
     if(n<RETRY.length)rt=setTimeout(()=>attempt(why,n+1),RETRY[n]);else emit('resumefail')})}
 if(AS){try{AS.type='playback'}catch{}
-  AS.addEventListener('statechange',()=>{note('audioSession -> '+AS.state);if(AS.state==='interrupted'){lastAS=Date.now();if(want&&cand&&Date.now()-cand<3000&&!intr)intr=cand}else resume('audioSession')})}
+  AS.addEventListener('statechange',()=>{note('audioSession -> '+AS.state);if(AS.state==='interrupted'){lastAS=Date.now();if(intr)weak=0;else if(want&&cand&&Date.now()-cand<3000){intr=cand;weak=0}}else resume('audioSession')})}
 document.addEventListener('visibilitychange',()=>{note('halaman '+(document.hidden?'tersembunyi':'tampil'));if(!document.hidden)resume('tampil')});
 addEventListener('pageshow',()=>resume('pageshow'));addEventListener('focus',()=>resume('focus'));
 note('boot (audioSession '+(AS?'ada, '+AS.state:'tidak ada')+')');
