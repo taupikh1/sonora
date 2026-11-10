@@ -138,6 +138,7 @@ function drawTime(){lyTick();const d0=audio.duration,d=isFinite(d0)&&d0?d0:(st.c
 E.setOnChange(k=>{if(k==='track')drawTrack();else if(k==='state'){drawState();if(audio.paused)saveLast()}else if(k==='time'){drawTime();if(timer&&Date.now()>=timerEnd)sleepFire();if(Date.now()-lastLp>2000)lpSave();if(Date.now()-lastSave>5000)saveLast()}
   else if(k==='cleared'){$('#mini').hidden=true;$('#np').hidden=true;S.del('kv','last');try{localStorage.removeItem('lp')}catch{}render()}
   else if(k==='blocked')toast('Pemutaran ditahan oleh sistem. Ketuk tombol play sekali lagi.')
+  else if(k==='seekfail')toast('Tidak bisa melompat ke posisi tersimpan. Geser slider untuk memilih posisi.')
   else if(k==='resumefail')toast('Tidak bisa melanjutkan otomatis setelah interupsi. Ketuk tombol play.')
   else if(k==='error'){const t=st.cur();toast(t?`Gagal memutar "${t.title}" (${t.format}). File rusak atau format tidak didukung browser ini.`:'Gagal memutar lagu.')}});
 // Phase 17: posisi disimpan ganda. localStorage (sinkron, tidak hilang bila halaman ditangguhkan iOS) tiap 2 dtk + saat pause/background; IndexedDB (antrean) tiap 5 dtk.
@@ -192,7 +193,7 @@ function settingsHtml(){const th=L('themeMode')||L('theme')||'system',ac=L('acce
   +g('Audio',r('bp','Mode Bit-Perfect',onoff(bp))+r('eq','Equalizer 10-band',bp?'Nonaktif (Bit-Perfect)':onoff(L('dsp_eq')==='1')+' · '+(L('eq_name')||'Flat'))+r('rg','ReplayGain (normalisasi volume)',bp?'Nonaktif (Bit-Perfect)':rg)+r('viz','Visualizer',bp?'Nonaktif (Bit-Perfect)':onoff(L('viz')==='1'))+r('vizm','Mode visualizer',L('viz_mode')==='wave'?'Waveform':'Spectrum')+r('ainfo','Informasi audio','Lihat'))
   +g('Pustaka',r('scan','Pindai musik','Pilih file')+r('sort','Urutan',{added:'Terbaru',title:'Judul',artist:'Artis'}[L('sort')||'added'])+r('art','Artwork album',onoff(L('art')!=='0'))+r('meta','Kelola metadata','Baca ulang tag · edit via ⋯'))
   +g('Penyimpanan',r('usage','Pemakaian penyimpanan',usage)+r('persist','Penyimpanan persisten','Minta')+r('tmp','Bersihkan data sementara','Bersihkan')+r('backup','Ekspor backup (daftar lagu, playlist, pengaturan)','Unduh')+r('restore','Pulihkan dari backup','Pilih file')+r('diag','Diagnostik perangkat','Lihat')+r('wipe','Hapus seluruh pustaka','Hapus'))
-  +g('Tentang',i('Versi aplikasi','SONORA 1.9')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
+  +g('Tentang',i('Versi aplikasi','SONORA 1.10')+i('Pengembang','Proyek pribadi SONORA')+i('Format didukung','MP3, AAC, M4A, WAV, FLAC, OGG, OPUS, AIFF (tergantung browser)')+i('Privasi','Data lokal di perangkat ini, tanpa akun & telemetri'))}
 const SA={reduce:()=>W('reduce',L('reduce')==='1'?'0':'1')||applyTheme(),
   gapless:()=>{W('gapless',L('gapless')==='1'?'0':'1');refreshCfg()},
   xf:()=>{if(ios||bpOn()||D.active())return toast(xfText());W('xf',{0:3,3:6,6:10,10:0}[+L('xf')||0]);refreshCfg()},

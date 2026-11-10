@@ -5,12 +5,24 @@ const mk=()=>{const a=new Audio();a.preload='auto';a.defaultPlaybackRate=a.playb
 let cur=mk(),nxt=null,oldEl=null,url,nxtUrl,ni=-1,pre=null,tm=0,iv=0,prepping=false,emit=()=>{};
 // Phase 13: `want` = aplikasi/pengguna MAU memutar (diset lewat audio.play()/audio.pause()). Jika elemen ter-pause padahal want=true dan bukan karena lagu habis,
 // berarti dijeda sistem (interupsi: aplikasi lain, panggilan, dll). `intr` = waktu interupsi dimulai (0 = tidak sedang terinterupsi).
-let want=false,intr=0,cand=0,lastAS=0,rt=0,weak=0,pend=0,orig=null;
+let want=false,intr=0,cand=0,lastAS=0,rt=0,weak=0,pend=0,orig=null,wdt=0,gs=0;
 const AS=navigator.audioSession,MAXGAP=30*60e3,WEAKGAP=15*60e3,RETRY=[500,1200,2500,5000];
 export const audio=new Proxy({},{get:(_,k)=>{if(k==='play')return()=>{want=true;return cur.play()};if(k==='pause')return()=>{want=false;intr=0;cand=0;clearTimeout(rt);cur.pause()};
-  const v=cur[k];return typeof v==='function'?v.bind(cur):v},set:(_,k,v)=>{if(k==='currentTime')pend=0;cur[k]=v;return true}});
-// Phase 17: `pend` = posisi tersimpan yang belum berhasil di-seek (iOS sering belum memuat metadata sebelum play). Selama pend>0, posisi yang disimpan/ditampilkan adalah pend, bukan currentTime (yang masih 0).
+  const v=cur[k];return typeof v==='function'?v.bind(cur):v},set:(_,k,v)=>{if(k==='currentTime')pend=0;cur[k]=v;if(k==='currentTime'&&isFinite(v))guardSeek(v);return true}});
+// Phase 17: `pend` = posisi tersimpan yang belum berhasil di-seek (iOS sering belum memuat metadata sebelum play). Selama pend>0, posisi yang disimpan/ditampilkan adalah pend, bukan currentTime.
 export const pos=()=>pend||cur.currentTime,pending=()=>pend;
+// Phase 18: pemulihan posisi yang tidak bisa macet. (1) Posisi awal diberikan lewat fragmen `#t=` pada URL (tanpa seek). (2) Satu kali seek langsung bila posisi belum tercapai. (3) Jika tetap gagal: muat ulang elemen di posisi itu. (4) Jika masih gagal: menyerah, `pend` dihapus supaya angka detik kembali mengikuti audio asli.
+// Seek biasa (slider, lirik, dll) dijaga sama: bila setelah 2,5 dtk elemen masih 'seeking' atau posisinya jauh dari target (elemen iOS yang macet), elemen dimuat ulang di posisi target.
+const frag=v=>url+'#t='+v.toFixed(1);
+function arm(el,v){pend=v;let t0=0,tries=0,did=0;clearInterval(wdt);const onMeta=()=>el.addEventListener('loadedmetadata',()=>{t0=Date.now()},{once:true});onMeta();
+  wdt=setInterval(()=>{if(cur!==el||!pend){clearInterval(wdt);return}if(!t0)return;const age=Date.now()-t0;
+    if(el.readyState>=1&&!el.seeking&&Math.abs(el.currentTime-pend)<1.5){pend=0;clearInterval(wdt);return}
+    if(!did&&age>1200&&!el.seeking){did=1;note('posisi tersimpan belum tercapai, seek langsung ke '+pend.toFixed(1));try{el.currentTime=pend}catch{}}
+    else if(age>5000){if(tries<1){tries=1;did=0;t0=0;onMeta();note('seek macet, elemen dimuat ulang di '+pend.toFixed(1));const w=!el.paused;el.src=frag(pend);if(w)el.play().catch(()=>{})}
+      else{note('gagal memulihkan posisi tersimpan, menyerah');pend=0;clearInterval(wdt);emit('seekfail')}}},300)}
+function guardSeek(v){clearTimeout(gs);const el=cur,u0=url,t0=Date.now();gs=setTimeout(()=>{if(cur!==el||url!==u0||!u0||!el.src)return;if(isFinite(el.duration)&&v>=el.duration-1)return;
+  const exp=v+(el.paused?0:(Date.now()-t0)/1000*(el.playbackRate||1));if(!el.seeking&&Math.abs(el.currentTime-exp)<=3)return;
+  note('seek ke '+v.toFixed(1)+' tidak berhasil, elemen dimuat ulang di posisi itu');const w=!el.paused;el.src=frag(v);arm(el,v);if(w)el.play().catch(()=>{})},2500)}
 // Log peristiwa audio (40 terakhir, bertahan walau halaman di-kill iOS) untuk Diagnostik.
 export const events=()=>{try{return JSON.parse(localStorage.getItem('alog'))||[]}catch{return[]}};
 export const note=m=>{try{const l=events();l.push([Date.now(),m]);localStorage.setItem('alog',JSON.stringify(l.slice(-40)))}catch{}};
@@ -23,12 +35,12 @@ export const setOnChange=f=>emit=f;
 const ms=navigator.mediaSession,dual=()=>cfg.allow&&(cfg.xf>0||cfg.gapless);
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 export function setQueue(ids,start=0){let q=[...ids];orig=st.shuffle?[...ids]:null;if(st.shuffle){const f=q.splice(start,1);q=[...f,...shuf(q)];start=0}st.queue=q;return playAt(start)}
-const reset=()=>{if(cur.volume!==1)cur.volume=1;if(pre){URL.revokeObjectURL(pre.url);pre=null}clearTimeout(tm);tm=0;clearInterval(iv);iv=0;if(oldEl){oldEl.pause();oldEl.removeAttribute('src');oldEl=null}if(nxt){nxt.removeAttribute('src');URL.revokeObjectURL(nxtUrl);nxt=null}};
+const reset=()=>{clearInterval(wdt);clearTimeout(gs);if(cur.volume!==1)cur.volume=1;if(pre){URL.revokeObjectURL(pre.url);pre=null}clearTimeout(tm);tm=0;clearInterval(iv);iv=0;if(oldEl){oldEl.pause();oldEl.removeAttribute('src');oldEl=null}if(nxt){nxt.removeAttribute('src');URL.revokeObjectURL(nxtUrl);nxt=null}};
 export async function playAt(i,play=true,pos=0){
   if(i<0||i>=st.queue.length)return;reset();st.i=i;pend=0;const t=st.cur();
   const b=t&&await get('blobs',t.id);if(!b){want=false;emit('error');return}
-  if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(b);audio.src=url;intr=0;cand=0;want=play;
-  if(pos>0){const el=cur;pend=pos;const go=()=>{if(cur!==el||!pend)return;try{el.currentTime=pend}catch{}};el.addEventListener('loadedmetadata',go);el.addEventListener('canplay',go);el.addEventListener('seeked',()=>{if(cur===el)pend=0})}
+  if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(b);audio.src=pos>0?frag(pos):url;intr=0;cand=0;want=play;
+  if(pos>0)arm(cur,pos);
   setMeta(t);emit('track');
   if(play)try{await audio.play()}catch(e){if(e.name==='NotAllowedError'){note('play diblokir browser (NotAllowedError)');emit('blocked')}else if(e.name!=='AbortError')emit('error')}}
 async function prep(){prepping=true;try{const me=st.i,i=me+1<st.queue.length?me+1:st.repeat==='all'?0:-1;
