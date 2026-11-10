@@ -27,5 +27,9 @@ Tes otomatis (`tests/e2e.mjs`) berjalan di Chromium, jadi **tidak** membuktikan 
 | 19 | Play dari Control Center setelah interupsi | Setelah interupsi (butir 15) bila lagu tidak lanjut sendiri: buka Control Center lalu tekan play | Lagu jalan. Jika Control Center menampilkan "Tidak Diputar" dan play tidak bereaksi: buka SONORA, Pengaturan, Diagnostik, screenshot bagian **LOG AUDIO** dan kirim | |
 | 20 | Detik lagu | Buka Now Playing, sentuh slider lalu geser jari keluar layar / tarik pusat notifikasi saat menyentuh. Ulangi beberapa kali | Angka detik dan slider tetap berjalan sesuai lagu | |
 | 21 | Tombol lock screen | Kunci layar saat lagu main, nyalakan layar | Ada tombol sebelumnya/berikutnya (bukan +/-10 dtk) | |
+| 22 | Posisi setelah ditutup | Putar lagu sampai menit 2, kunci layar, tunggu, lalu tutup tab dari app switcher dan buka lagi | Angka detik langsung menunjukkan ±menit 2; tekan play, lanjut dari sana | |
+| 23 | Posisi saat dibuka lalu ditinggal | Buka SONORA (lagu dipulihkan, pause), langsung pindah ke app lain tanpa play, buka lagi | Posisi tetap sama, tidak jadi 0:00 | |
+| 24 | Sosmed lalu kembali ke SONORA | Putar lagu, buka sosmed dan putar video, tutup sosmed, buka SONORA | Lagu lanjut sendiri dalam beberapa detik. Bila tidak: Diagnostik, screenshot LOG AUDIO | |
+| 25 | Pause oleh earphone | Putar lagu, lepas AirPods saat layar terkunci, nyalakan layar | Tetap pause (pause saat layar tampil tidak dilanjutkan). Catat jika malah lanjut lewat speaker | |
 
 **Catatan:** Web Audio (EQ, ReplayGain, Visualizer) bisa ditangguhkan iOS saat layar terkunci. Karena itu aplikasi mematikannya otomatis (lihat pesan toast). Itu perilaku yang disengaja, bukan bug.
